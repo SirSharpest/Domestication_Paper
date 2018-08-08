@@ -2,8 +2,9 @@
 #+AUTHOR: NH, CN, HO, JD
 #+OPTIONS: toc:nil H:4
 #+LaTeX_CLASS: article
-#+LaTeX_CLASS_OPTIONS: [a4paper]
-#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_CLASS_OPTIONS: [a4paper, twocolumn]
+#+LaTeX_HEADER: \usepackage[margin=0.6in]{geometry}
+#+LaTeX_HEADER: \setlength{\columnsep}{0.4in}
 #+LaTeX_HEADER: \usepackage{amssymb,amsmath}
 #+LaTeX_HEADER: \usepackage{fancyhdr} %For headers and footers
 #+LaTeX_HEADER: \pagestyle{fancy} %For headers and footers
@@ -23,50 +24,81 @@
 #+LaTeX_HEADER: \usepackage[parfill]{parskip}
 #+LaTeX_HEADER:\usepackage{subfig}
 #+latex_header: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
+#+latex_header: \usepackage[none]{hyphenat}
 #+LATEX_HEADER_EXTRA:  \usepackage{framed}
 
 
+
 * Introduction
-<Not sure on>
+<Waiting for Hugo>
 
-
-\clearpage
 * Results
 
-Four key species, two diploid and two tetraploid were selected to study the effect on grain morphology across domestication and polyploidisation. Domesticated /T. monococcum/ and primitive
- /T. boeticum/ were selected for being diploid; Domesticated /T. dicoccum/ as primitive /T. dicoccoides/ were chosen as representive species for tetraploids. (See Figure 1)
 
-Key grain morphological traits were measured using micro-CT imaging, these include length, width, depth, volume, surface area
+Four key species, two diploid (Einkorn) and two tetraploid (Emmer) were selected to study the effect on grain morphology across domestication and polyploidisation. Domesticated  /T. monococcum/ and primitive /T. boeticum/ were selected for being diploid; Domesticated /T. dicoccum/ as primitive /T. dicoccoides/ were chosen as representative species for tetraploids. (See Figure 1)
 
 #+CAPTION: Einkorn (top) and Emmer (bottom) Wheat (Primitives left, Domesticated right)
 #+ATTR_LATEX: :width 8cm
 #+NAME: fig:wheat
 [[~/Dropbox/NPPC/Domestication/Figures/fig1.png]]
 
+
+Key grain morphological traits were measured using micro-CT imaging, these include length, width, depth, volume, and surface area. From these traits, two additional descriptors were created LWD (Length X Width X Depth) and Surface area / Volume ratio these are used to provide insight to potential trait interactions.
+
+Traits were gathered using image analysis software cite:Hughes2017, major modifications were made to grain identification algorithms in order to adapt to the wide variety in the species studied.
+
+Analysis was performed using a Welch T-test for significance and confidence intervals. Kruchke's method was used for Bayesian estimation of difference cite:Kruschke2012 in order to quantify differences in population means. Estimation of domestication status was achieved through multiple regression (using ordinary least squares methods).
+
+Principle Component Analysis (PCA) was used to highlight separation of species based on grain measurements, in addition to the effect of specific traits in model though reported eigenvalues/coefficient loadings.
+
 ** Einkorn
 
+*** Grain Traits
+No noticeable change has been observed in the length attribute between domesticated and wild einkorn ($p=0.02$ and a predicted $35\%$ probability of overlapping averages).
+
 #+CAPTION: Einkorn Traits
-#+ATTR_LATEX: :width 16cm
-#+NAME: fig:pca
+#+ATTR_LATEX: :width 9cm
+#+NAME: fig:einkorntraits
 [[~/Dropbox/NPPC/Domestication/Figures/fig2.png]]
 
-#+CAPTION: Emmer Traits
-#+ATTR_LATEX: :width 16cm
-#+NAME: fig:pca
-[[~/Dropbox/NPPC/Domestication/Figures/fig4.png]]
+However, other traits(figure:2): length, width, depth, volume and surface area all have a significant change between wild and domesticated ($p<0.01$).
 
+\clearpage
+
+*** Principle Component Analysis
+A two component PCA reviled that no dominant trait appears to influence morphometric variation in einkorn species (figure:3).
 
 #+CAPTION: Einkorn PCA
-#+ATTR_LATEX: :width 8cm
+#+ATTR_LATEX: :width 9cm
 #+NAME: fig:einpca
 [[~/Dropbox/NPPC/Domestication/Figures/fig3.png]]
 
+With the exception of grain length (-0.24), all other measurements (width, depth, volume, surface area and the interaction term LxWxD) have coefficients ranging -0.38 to -0.46 in the first principle component (76.77% of explained variation).
 
+** Emmer
+
+*** Grain Traits
+With length, Emmer displays no significant difference in grain length between wild and domesticated species ($p=0.93$).
+
+Additionally, surface area of grain is reported as non-significant ($p=0.17$). Showing that grain compactness has significantly altered to preserve this trait (Figure: 4). The Bayesian model predicted a $20\%$ probability of domesticated and wild types differing, showing that there is an indication of change. Though, with a high enough probability of this being down to chance.
+
+#+CAPTION: Emmer Traits
+#+ATTR_LATEX: :width 9cm
+#+NAME: fig:pca
+[[~/Dropbox/NPPC/Domestication/Figures/fig4.png]]
+
+The traits width, depth and volume have all shown significant change during Emmer domestication ($p<0.01$).
+
+*** Principle Component Analysis
+
+A two component PCA, with PC1 and PC2 providing 78% and 15% respectively, shows that traits width, depth, volume, surface area as well as the interaction term LxWxD have moderate influence in grain morphology (Figure:5); length shows the lowest impact ($coef = -0.31$).
 
 #+CAPTION: Emmer PCA
-#+ATTR_LATEX: :width 8cm
+#+ATTR_LATEX: :width 9cm
 #+NAME: fig:emmpca
 [[~/Dropbox/NPPC/Domestication/Figures/fig5.png]]
+
+The second principle component, with much less explanation, shows that the interaction between length, width and depth is much less important in explaining variance whilst length alone ($coef=0.72$) provides significant coverage.
 
 
 * Methods
@@ -97,7 +129,7 @@ The software, developed in MATLAB (cite:MATHWORKS2017), is freely available at <
 The scanning and MATLAB routine pipeline:
 
 #+CAPTION: Pipeline
-#+ATTR_LATEX: :width 12cm
+#+ATTR_LATEX: :width 9cm
 #+NAME: fig:pipe
 [[~/Dropbox/NPPC/Domestication/Figures/Suppl/matlab.png]]
 
@@ -147,14 +179,14 @@ A linear model allowed for an R^2 value of 0.91 in einkorn species when predicti
 *** Draft Supplemental figure for dom
 
 #+CAPTION: is showing a multiple regression of r=.91 by using length, width and depth to correctly ID domestication status.
-#+ATTR_LATEX: :width 18cm
+#+ATTR_LATEX: :width 9cm
 #+NAME: fig:reg
 [[~/Dropbox/NPPC/Domestication/Figures/Suppl/Reg_Dom.png]]
 
 
 *** Draft Supplemental figure for volume
 #+CAPTION: Showing the importance of 3rd dimension of depth
-#+ATTR_LATEX: :width 12cm
+#+ATTR_LATEX: :width 9cm
 #+NAME: fig:reg2
 [[~/Dropbox/NPPC/Domestication/Figures/Suppl/Regression_Analysis_Vol.png]]
 
@@ -183,6 +215,7 @@ Wondering outloud, with the wild 2n/4n an oberserved change in surface area. Wou
 reason for why grains would want to develop a larger surface area? Alternatively we can work off-of volume, as that changes also
 
 \clearpage
+\onecolumn
 * Data Tables
 
 ** einkorn
@@ -217,5 +250,6 @@ reason for why grains would want to develop a larger surface area? Alternatively
 [[./wild.png]]
 
 \clearpage
+
 bibliography:library.bib
 bibliographystyle:unsrt
