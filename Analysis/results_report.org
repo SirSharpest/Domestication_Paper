@@ -1,0 +1,383 @@
+#+OPTIONS: toc:nil H:4
+#+LaTeX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_HEADER: \usepackage{amssymb,amsmath}
+#+LaTeX_HEADER: \usepackage{fancyhdr} %For headers and footers
+#+LaTeX_HEADER: \pagestyle{fancy} %For headers and footers
+#+LaTeX_HEADER: \usepackage{lastpage} %For getting page x of y
+#+LaTeX_HEADER: \usepackage{float} %Allows the figures to be positioned and formatted nicely
+#+LaTeX_HEADER: \restylefloat{figure} %and this command
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \hypersetup{urlcolor=blue}
+#+LaTex_HEADER: \usepackage{titlesec}
+#+LaTex_HEADER: \setcounter{secnumdepth}{4}
+#+LaTeX_HEADER: \usepackage{minted}
+#+LATEX_HEADER: \setminted{frame=single,framesep=10pt}
+#+LaTeX_HEADER: \chead{}
+#+LaTeX_HEADER: \rhead{\today}
+#+LaTeX_HEADER: \cfoot{}
+#+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
+#+LaTeX_HEADER: \usepackage[parfill]{parskip}
+#+LaTeX_HEADER:\usepackage{subfig}
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
+#+LATEX_HEADER_EXTRA:  \usepackage{framed}
+
+
+#+BEGIN_SRC ipython :session :exports none
+  from ci import *
+#+END_SRC
+
+#+RESULTS:
+: # Out[7]:
+
+
+* Averages
+
+** tables
+#+BEGIN_SRC ipython :session  :exports results :results output drawer :exports none
+  from tabulate import tabulate
+  import pandas as pd
+  atts = ['length', 'width', 'depth', 'volume', 'length_depth_width']
+
+  means = lambda df: df.groupby(['Sample Type', 'Wild/Domesticated'],
+			  as_index=False)[atts].mean()
+
+  print(tabulate(means(pd.concat([einkorn, emmer, barley])),
+		 ['idx','Sample Type', 'Domestication'] + atts, 'orgtbl') )
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+| idx | Sample Type    | Domestication |  length |   width |   depth |  volume | length_depth_width |
+|-----+----------------+---------------+---------+---------+---------+---------+--------------------|
+|   0 | H. spontaneum  | wild          |  7.6705 | 2.83964 | 1.77413 | 19.7661 |            39.1044 |
+|   1 | H. vulgare     | domesticated  | 5.54881 | 3.16844 | 2.27528 | 20.5476 |            40.4507 |
+|   2 | T. beoticum    | wild          | 5.67469 |  2.3575 | 1.52986 | 11.3988 |            21.0029 |
+|   3 | T. dicoccoides | wild          | 6.34376 | 2.53366 | 1.95585 | 17.2728 |            33.1034 |
+|   4 | T. dicoccum    | domesticated  | 6.36795 | 3.05924 | 2.59588 | 25.7611 |            51.0032 |
+|   5 | T. monococcum  | domesticated  | 5.76834 | 2.93219 | 2.09178 | 17.4042 |            35.5078 |
+:END:
+
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results
+  import seaborn as sns
+  from sklearn import preprocessing
+  plt.style.use('classic')
+  plt.rcParams['figure.figsize'] = (6, 4)
+  min_max_scaler = preprocessing.MinMaxScaler()
+
+  nmlEinkorn = einkorn.copy(deep=True)
+  for idx, a in enumerate(atts):
+      x = np.reshape(np.array(nmlEinkorn[a]), (-1,1))
+      x = min_max_scaler.fit_transform(x)
+      nmlEinkorn[a] = x + idx
+  ax = nmlEinkorn[atts].plot()
+
+  ax.legend(loc='center left', bbox_to_anchor=(1, 0.5));
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[9]:
+[[file:./obipy-resources/mf03Cj.png]]
+:END:
+
+* IDEA  Regression
+
+** Simple Reg
+#+BEGIN_SRC ipython :session :results output  :exports results
+  import statsmodels.api as sm
+
+  target = pd.DataFrame(einkorn['Wild/Domesticated'], columns=['Wild/Domesticated'])
+  target['Wild/Domesticated'] = target['Wild/Domesticated'].replace((target['Wild/Domesticated'].unique()[0],
+								       target['Wild/Domesticated'].unique()[1]),
+								      (1, 0))
+  x = einkorn['volume']
+  y = target['Wild/Domesticated']
+
+  model = sm.OLS(y,x).fit()
+  predictions = model.predict(x)
+
+  print(model.summary())
+
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+			    OLS Regression Results
+==============================================================================
+Dep. Variable:      Wild/Domesticated   R-squared:                       0.800
+Model:                            OLS   Adj. R-squared:                  0.800
+Method:                 Least Squares   F-statistic:                     2998.
+Date:                Wed, 01 Aug 2018   Prob (F-statistic):          4.55e-264
+Time:                        10:15:29   Log-Likelihood:                -318.03
+No. Observations:                 750   AIC:                             638.1
+Df Residuals:                     749   BIC:                             642.7
+Df Model:                           1
+Covariance Type:            nonrobust
+==============================================================================
+		 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+volume         0.0460      0.001     54.755      0.000       0.044       0.048
+==============================================================================
+Omnibus:                      128.141   Durbin-Watson:                   0.272
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):               75.849
+Skew:                          -0.646   Prob(JB):                     3.39e-17
+Kurtosis:                       2.130   Cond. No.                         1.00
+==============================================================================
+
+Warnings:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+#+end_example
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results
+  sns.regplot(x,y);
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[11]:
+[[file:./obipy-resources/qYqG95.png]]
+:END:
+
+
+** Playing with constants
+#+BEGIN_SRC ipython :session :results output  :exports results
+
+  import statsmodels.api as sm
+
+  target = pd.DataFrame(einkorn['Wild/Domesticated'], columns=['Wild/Domesticated'])
+  target['Wild/Domesticated'] = target['Wild/Domesticated'].replace((target['Wild/Domesticated'].unique()[0],
+												 target['Wild/Domesticated'].unique()[1]),
+												(1, 0))
+  x = einkorn['volume']
+  y = target['Wild/Domesticated']
+  #x = sm.add_constant(x) # beta_0
+
+
+  model = sm.OLS(y,x).fit()
+  predictions = model.predict(x)
+
+  print(model.summary())
+
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+			    OLS Regression Results
+==============================================================================
+Dep. Variable:      Wild/Domesticated   R-squared:                       0.800
+Model:                            OLS   Adj. R-squared:                  0.800
+Method:                 Least Squares   F-statistic:                     2998.
+Date:                Tue, 17 Jul 2018   Prob (F-statistic):          4.55e-264
+Time:                        16:07:20   Log-Likelihood:                -318.03
+No. Observations:                 750   AIC:                             638.1
+Df Residuals:                     749   BIC:                             642.7
+Df Model:                           1
+Covariance Type:            nonrobust
+==============================================================================
+		 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+volume         0.0460      0.001     54.755      0.000       0.044       0.048
+==============================================================================
+Omnibus:                      128.141   Durbin-Watson:                   0.272
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):               75.849
+Skew:                          -0.646   Prob(JB):                     3.39e-17
+Kurtosis:                       2.130   Cond. No.                         1.00
+==============================================================================
+
+Warnings:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+#+end_example
+
+** Potentially useful for modelling Ploidy/DomStatus
+
+#+BEGIN_SRC ipython :session :results output  :exports results
+  def aggregate_average_attribute(df, att):
+      return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
+				    as_index=False)[att].mean()
+
+  atts = ['length','width','depth','length_depth_width', 'surface_area','volume']
+  df = aggregate_average_attribute(pd.concat([einkorn]), atts)
+
+
+  target = pd.DataFrame(df[['Wild/Domesticated', 'Ploidy']], columns=['Wild/Domesticated', 'Ploidy'])
+  target['Wild_Domesticated'] = target['Wild/Domesticated'].replace((target['Wild/Domesticated'].unique()[0],target['Wild/Domesticated'].unique()[1]),(0, 1))
+  df['Wild_Domesticated'] = target['Wild_Domesticated']
+
+  x = df[atts]
+  y = target['Wild_Domesticated']
+  x = sm.add_constant(x, prepend=False)
+  model = sm.OLS(y,x).fit()
+  predictions = model.predict(x)
+  print(model.summary())
+
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+			    OLS Regression Results
+==============================================================================
+Dep. Variable:      Wild_Domesticated   R-squared:                       0.864
+Model:                            OLS   Adj. R-squared:                  0.831
+Method:                 Least Squares   F-statistic:                     26.39
+Date:                Thu, 02 Aug 2018   Prob (F-statistic):           1.14e-09
+Time:                        10:14:09   Log-Likelihood:                 9.2250
+No. Observations:                  32   AIC:                            -4.450
+Df Residuals:                      25   BIC:                             5.810
+Df Model:                           6
+Covariance Type:            nonrobust
+======================================================================================
+			 coef    std err          t      P>|t|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+length                -0.5593      0.458     -1.220      0.234      -1.503       0.385
+width                 -0.6781      0.642     -1.056      0.301      -2.001       0.645
+depth                 -1.6848      1.197     -1.408      0.172      -4.149       0.780
+length_depth_width     0.0526      0.073      0.724      0.476      -0.097       0.202
+surface_area          -0.0848      0.023     -3.708      0.001      -0.132      -0.038
+volume                 0.1173      0.101      1.162      0.256      -0.091       0.325
+const                  8.5150      4.020      2.118      0.044       0.235      16.795
+==============================================================================
+Omnibus:                        0.911   Durbin-Watson:                   1.626
+Prob(Omnibus):                  0.634   Jarque-Bera (JB):                0.703
+Skew:                           0.351   Prob(JB):                        0.704
+Kurtosis:                       2.815   Cond. No.                     6.15e+03
+==============================================================================
+
+Warnings:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 6.15e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.
+#+end_example
+
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results
+  from statsmodels.graphics.api import abline_plot
+  plt.rcParams['figure.figsize'] = (14, 5)
+  fig, ax = plt.subplots(1)
+  ax.plot(np.arange(len(x)), model.fittedvalues, '--', c='r', label='prediction')
+  ax.scatter(np.arange(len(x)),y, label='actual values')
+  ax.legend(loc='upper right')
+  ax.set_xlim(0, len(x))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[161]:
+: (0, 32)
+[[file:./obipy-resources/syljaN.png]]
+:END:
+
+
+** GLM for W/D
+#+BEGIN_SRC ipython :session :results output :exports results
+  import statsmodels.formula.api as smf
+
+  model = smf.ols('Wild_Domesticated ~  length * depth  * width -1 ', data=df).fit()
+
+  print(model.summary())
+
+
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+			    OLS Regression Results
+==============================================================================
+Dep. Variable:      Wild_Domesticated   R-squared:                       0.907
+Model:                            OLS   Adj. R-squared:                  0.880
+Method:                 Least Squares   F-statistic:                     34.64
+Date:                Thu, 02 Aug 2018   Prob (F-statistic):           2.49e-11
+Time:                        10:14:54   Log-Likelihood:                 6.9286
+No. Observations:                  32   AIC:                            0.1429
+Df Residuals:                      25   BIC:                             10.40
+Df Model:                           7
+Covariance Type:            nonrobust
+======================================================================================
+			 coef    std err          t      P>|t|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+length                 0.1931      0.495      0.390      0.700      -0.826       1.213
+depth                 -7.8914      7.669     -1.029      0.313     -23.685       7.902
+length:depth           1.2357      1.342      0.921      0.366      -1.529       4.000
+width                 16.5819      4.646      3.569      0.001       7.014      26.150
+length:width          -2.7293      0.745     -3.662      0.001      -4.264      -1.194
+depth:width           -4.9704      2.414     -2.059      0.050      -9.941       0.000
+length:depth:width     0.8110      0.413      1.963      0.061      -0.040       1.662
+==============================================================================
+Omnibus:                        6.253   Durbin-Watson:                   1.919
+Prob(Omnibus):                  0.044   Jarque-Bera (JB):                4.744
+Skew:                           0.896   Prob(JB):                       0.0933
+Kurtosis:                       3.590   Cond. No.                     8.02e+03
+==============================================================================
+
+Warnings:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 8.02e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.
+#+end_example
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  from statsmodels.graphics.api import abline_plot
+  plt.rcParams['figure.figsize'] = (14, 3)
+  fig, ax = plt.subplots(1)
+  ypred = model.predict(x)
+  ax.plot(np.arange(len(x)), ypred,  c='r', label='prediction', linestyle='--')
+  ax.scatter(np.arange(len(x)),y, label='actual values', c='b')
+  ax.legend(loc='upper left')
+  #ax.set_xlim(0, len(x))
+  #ax.set_ylim(-0.5,1.5)
+  ax.set_title(r'$R^2$:{0}'.format(np.around(model.rsquared, 2)))
+  labels = [item.get_text() for item in ax.get_yticklabels()]
+  labels[2] = 'Wild Einkorn'
+  labels[7] = 'Domesticated\nEinkorn'
+  _ = ax.set_yticklabels(labels)
+
+  fig.savefig('../Figures/Suppl/Reg_Dom.png')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[203]:
+[[file:./obipy-resources/frY71i.png]]
+:END:
+
+
+** Regression for showing 3D usefulness
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  import statsmodels.formula.api as smf
+  plt.rcParams['figure.figsize'] = (14, 10)
+  fig, axes = plt.subplots(2)
+
+  x = df[atts]
+  y = df['volume']
+
+  def plot_model(ax, model, title):
+      ypred = model.predict(x)
+      ax.plot(np.arange(len(x)), ypred,  c='r', label='prediction', linestyle='--')
+      ax.scatter(np.arange(len(x)),y, label='actual values', c='b')
+      sst_val = sum(map(lambda x: np.power(x,2),y-np.mean(y)))
+      sse_val = sum(map(lambda x: np.power(x,2),model.resid_response))
+      r2 = 1.0 - sse_val/sst_val
+      ax.set_title('{1} | R2={0}'.format(np.around(r2,2), title))
+      ax.set_ylabel('Volume')
+
+
+  model1 = smf.glm('volume ~  length * depth * width -1', data=df).fit()
+  model2 = smf.glm('volume ~  depth * width -1', data=df).fit()
+  model3 = smf.glm('volume ~  length * width', data=df).fit()
+  model4 = smf.glm('volume ~  length * depth', data=df).fit()
+
+  plot_model(axes[0], model1, 'Length + Width + Depth')
+  plot_model(axes[1], model3, 'Length + Width')
+  fig.tight_layout()
+  fig.savefig('../Figures/Suppl/Regression_Analysis_Vol.png')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[195]:
+[[file:./obipy-resources/KvS3ht.png]]
+:END:

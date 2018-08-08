@@ -1,0 +1,221 @@
+#+TITLE: Domestication Draft
+#+AUTHOR: NH, CN, HO, JD
+#+OPTIONS: toc:nil H:4
+#+LaTeX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_HEADER: \usepackage{amssymb,amsmath}
+#+LaTeX_HEADER: \usepackage{fancyhdr} %For headers and footers
+#+LaTeX_HEADER: \pagestyle{fancy} %For headers and footers
+#+LaTeX_HEADER: \usepackage{lastpage} %For getting page x of y
+#+LaTeX_HEADER: \usepackage{float} %Allows the figures to be positioned and formatted nicely
+#+LaTeX_HEADER: \restylefloat{figure} %and this command
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \hypersetup{urlcolor=blue}
+#+LaTex_HEADER: \usepackage{titlesec}
+#+LaTex_HEADER: \setcounter{secnumdepth}{4}
+#+LaTeX_HEADER: \usepackage{minted}
+#+LATEX_HEADER: \setminted{frame=single,framesep=10pt}
+#+LaTeX_HEADER: \chead{}
+#+LaTeX_HEADER: \rhead{\today}
+#+LaTeX_HEADER: \cfoot{}
+#+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
+#+LaTeX_HEADER: \usepackage[parfill]{parskip}
+#+LaTeX_HEADER:\usepackage{subfig}
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
+#+LATEX_HEADER_EXTRA:  \usepackage{framed}
+
+
+* Introduction
+<Not sure on>
+
+
+\clearpage
+* Results
+
+Four key species, two diploid and two tetraploid were selected to study the effect on grain morphology across domestication and polyploidisation. Domesticated /T. monococcum/ and primitive
+ /T. boeticum/ were selected for being diploid; Domesticated /T. dicoccum/ as primitive /T. dicoccoides/ were chosen as representive species for tetraploids. (See Figure 1)
+
+Key grain morphological traits were measured using micro-CT imaging, these include length, width, depth, volume, surface area
+
+#+CAPTION: Einkorn (top) and Emmer (bottom) Wheat (Primitives left, Domesticated right)
+#+ATTR_LATEX: :width 8cm
+#+NAME: fig:wheat
+[[~/Dropbox/NPPC/Domestication/Figures/fig1.png]]
+
+** Einkorn
+
+#+CAPTION: Einkorn Traits
+#+ATTR_LATEX: :width 16cm
+#+NAME: fig:pca
+[[~/Dropbox/NPPC/Domestication/Figures/fig2.png]]
+
+#+CAPTION: Emmer Traits
+#+ATTR_LATEX: :width 16cm
+#+NAME: fig:pca
+[[~/Dropbox/NPPC/Domestication/Figures/fig4.png]]
+
+
+#+CAPTION: Einkorn PCA
+#+ATTR_LATEX: :width 8cm
+#+NAME: fig:einpca
+[[~/Dropbox/NPPC/Domestication/Figures/fig3.png]]
+
+
+
+#+CAPTION: Emmer PCA
+#+ATTR_LATEX: :width 8cm
+#+NAME: fig:emmpca
+[[~/Dropbox/NPPC/Domestication/Figures/fig5.png]]
+
+
+* Methods
+** Materials
+ < Plants which were used > ...
+*** How they were sourced
+*** Any additional information
+
+** 3D Scanning of Spikes
+
+From the genotypes selected, fully dried,
+representative spikes were chosen for micro-CT scanning.
+Spikes were placed in plastic holders (34x70mm tubes) and imaged using a a μCT100 scanner (Scanco Medical, Switzerland).
+
+The imaging system was configured with an X-ray source ranging from 20 to 100 kVp,
+a detector of 3072 x 400 elements. A resolution of 68.8 micro-meters per pixel was used for all scans.
+
+
+** Computational Methods
+
+Using software developed for previous wheat studies by the National Plant Phenomics Centre (cite:Hughes2017) . New and novel additions are implemented in the watershedding and segmentation processes, of the existing pipeline, in order to work with the more complex primitive species of wheat.
+
+Due to the optimised resolution of the imaging technique (68.6\micro meters per pixel) objects can appear connected which are not, particularly in primitive grain. A three dimensional watershedding algorithm is used to correct any objects which appear connected when they should not be.
+
+The software, developed in MATLAB (cite:MATHWORKS2017), is freely available at <insert link to NPPC>.
+
+**** Pipeline
+The scanning and MATLAB routine pipeline:
+
+#+CAPTION: Pipeline
+#+ATTR_LATEX: :width 12cm
+#+NAME: fig:pipe
+[[~/Dropbox/NPPC/Domestication/Figures/Suppl/matlab.png]]
+
+*** Morphometric Features
+
+ The features/phenotypes used are extracted during the imaging process.
+
+ - Length is calculated using the major axis of the whole grain.
+ - Width and depth are the major and minor axis of a cross section, found by selecting the grain's midpoint.
+ - Volume is a complete connected pixel count per grain
+ - Surface area is a single pixel perimeter calculation mapped in 3 dimensions
+ - Length X Depth X Width is a post-image-processing value calculated by the interaction between the three dimension descriptors.
+
+ Values used in statistical functions and measurements are presented as metric units, derived from \micro-CT image pixel values. The equation:[[eqn:mm]] is presented here.
+ #+NAME: eqn:mm
+ \begin{align}
+   &\begin{aligned}
+ mm = \frac{pixel \times 68.8}{1000}
+   \end{aligned}
+ \end{align}
+
+*** Error Removal
+The data were checked for false positives, this is done by first removing outliers which are found by the 0.025 upper and lower percentiles of the data. Additionally constraints are applied to the data based on findings from previous studies cite:Hughes2017, this adds robustness.
+
+*** LWD
+An additional phenotype is created to describe the interaction between the geometric parameters; the interaction is described in equation:[[eqn:inter]].
+
+ #+NAME: eqn:inter
+ \begin{align}
+   &\begin{aligned}
+\text{geometry interaction} = length \times depth \times width
+   \end{aligned}
+ \end{align}
+
+*** Image Analysis Methods
+ */I could provide a lot of info on this, but weary of going off-track, more can be added (or taken away) if needed, what's in comp methods could be enough I think./*
+
+** Bayesian Modelling
+To provide deeper insight into the size of change or similarity in hypothesis testing, a Bayesian model is used. To estimate probability of two samples containing the same mean the method uses Bayes theorem ($P(A|B) \propto P(B|A) \times P(A)$) cite:Kruschke2012 along with Markov-Chain-Monte-Carlo (MCMC) to draw random samples from a normal population.
+
+From Krusches' method a percentage likelihood of difference is produced.
+
+** Linear Modelling
+
+A linear model allowed for an R^2 value of 0.91 in einkorn species when predicting domestication status.
+
+*** Draft Supplemental figure for dom
+
+#+CAPTION: is showing a multiple regression of r=.91 by using length, width and depth to correctly ID domestication status.
+#+ATTR_LATEX: :width 18cm
+#+NAME: fig:reg
+[[~/Dropbox/NPPC/Domestication/Figures/Suppl/Reg_Dom.png]]
+
+
+*** Draft Supplemental figure for volume
+#+CAPTION: Showing the importance of 3rd dimension of depth
+#+ATTR_LATEX: :width 12cm
+#+NAME: fig:reg2
+[[~/Dropbox/NPPC/Domestication/Figures/Suppl/Regression_Analysis_Vol.png]]
+
+*** Least Squares Model
+
+Equation, where the intercept (\beta_0) has been set by surface area
+
+$$ Y = \beta_0 + \times \beta_1 length \times \beta_2 depth \times \beta_3 width  + \epsilon $$
+
+*** Misc
+The model produced an r^2 value by:
+
+$$1- \frac{\sum\limits_{i=0}^{n}{r^2}}{\sum\limits_{i=0}^{n}{(y_i - \overline{y})^2 }}$$
+
+
+
+* Misc Information to fold into discussion?
+
+Fuller has evidenced that grain volume is used when initially identifying wheat grain which is recovered as being domesticated cite:Fuller2007 .
+Therefore justification for our model is very useful.
+
+On the other hand cite:Willcox2004 found that barley is much harder to identify from it's domesticated relatives.
+ Volume is not significantly different! Which fits perfectly with our results!
+
+Wondering outloud, with the wild 2n/4n an oberserved change in surface area. Would there be a
+reason for why grains would want to develop a larger surface area? Alternatively we can work off-of volume, as that changes also
+
+\clearpage
+* Data Tables
+
+** einkorn
+#+NAME: fig:einkorn
+#+CAPTION: einkorn table
+[[./einkorn.png]]
+
+
+** emmer
+#+NAME: fig:emmer
+#+CAPTION: emmer table
+[[./emmer.png]]
+
+\clearpage
+
+
+** Barley
+#+NAME: fig:barley
+#+CAPTION: barley table
+[[./barley.png]]
+
+
+** Domesticated 2N, 4N
+#+NAME: fig:dom
+#+CAPTION: domesticated 2N, 4N table
+[[./dom.png]]
+
+\clearpage
+** Wild 2N, 4N
+#+NAME: fig:wild
+#+CAPTION: wild 2N, 4N  table
+[[./wild.png]]
+
+\clearpage
+bibliography:library.bib
+bibliographystyle:unsrt
