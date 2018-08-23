@@ -1,0 +1,54 @@
+#+TITLE: Domestication Update
+#+AUTHOR: Nathan Hughes
+#+OPTIONS: toc:nil num:nil
+#+LaTeX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_HEADER: \usepackage{amssymb,amsmath}
+#+LaTeX_HEADER: \usepackage{fancyhdr} %For headers and footers
+#+LaTeX_HEADER: \pagestyle{fancy} %For headers and footers
+#+LaTeX_HEADER: \usepackage{lastpage} %For getting page x of y
+#+LaTeX_HEADER: \usepackage{float} %Allows the figures to be positioned and formatted nicely
+#+LaTeX_HEADER: \restylefloat{figure} %and this command
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \hypersetup{urlcolor=blue}
+#+LaTex_HEADER: \usepackage{titlesec}
+#+LaTex_HEADER: \setcounter{secnumdepth}{4}
+#+LaTeX_HEADER: \usepackage{minted}
+#+LATEX_HEADER: \setminted{frame=single,framesep=10pt}
+#+LaTeX_HEADER: \chead{}
+#+LaTeX_HEADER: \rhead{\today}
+#+LaTeX_HEADER: \cfoot{}
+#+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
+#+LaTeX_HEADER: \usepackage[parfill]{parskip}
+#+LaTeX_HEADER:\usepackage{subfig}
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
+#+LATEX_HEADER_EXTRA:  \usepackage{framed}
+
+* TODO Nathan [20%]
+- [ ] Arrange for method of inspecting random grains with biologist to judge if they are "shrivelled" or aborted
+- [X] Look at range of seeds from the 3 group pairs
+  - [X] Look at max volume seeds
+  - [X] Look at min volume seeds
+  - [X] Look at seeds in middle of volume range
+- [ ] Redo Hugo's idea for PCA but with the 6 genotypes *only*
+  - [ ] Pairwse
+  - [ ] 4 Wheats
+- [ ] Spike Traits
+- [ ]
+
+* TODO Biologist(s)
+- [X] Examine CT grains visually, to determine "shrivelled status"
+  - Nathan needs to make arrangements for this
+- [ ] Agree on naming conventions for species in text, figures and plots
+
+* DONE Figures
+  CLOSED: [2018-07-05 Thu 11:49]
+- [X] Arrange an idea for figure 1 with 2X3 grid of spikes in comparison style
+  - Possibly try first with just segmented images
+  - Also try with semi-translucent spike features still in image
+
+* IDEA Misc
+- [X] Get spreadsheet data from Hugo for Marvin
+- [X] Ask if Nathan can style the plots/figures from Hugo for consistency
+  - /Lower/ priority, but still important

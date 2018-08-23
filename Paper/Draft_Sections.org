@@ -8,6 +8,8 @@
 #+LaTeX_HEADER: \usepackage{amssymb,amsmath}
 #+LaTeX_HEADER: \usepackage{fancyhdr} %For headers and footers
 #+LaTeX_HEADER: \pagestyle{fancy} %For headers and footers
+#+LaTeX_HEADER: \fancyfoot[CE,CO]{}
+#+LaTeX_HEADER: \fancyhead[LE,LO]{}
 #+LaTeX_HEADER: \usepackage{lastpage} %For getting page x of y
 #+LaTeX_HEADER: \usepackage{float} %Allows the figures to be positioned and formatted nicely
 #+LaTeX_HEADER: \restylefloat{figure} %and this command
@@ -18,8 +20,7 @@
 #+LaTeX_HEADER: \usepackage{minted}
 #+LATEX_HEADER: \setminted{frame=single,framesep=10pt}
 #+LaTeX_HEADER: \chead{}
-#+LaTeX_HEADER: \rhead{\today}
-#+LaTeX_HEADER: \cfoot{}
+#+LaTeX_HEADER: \rhead{Section: \thesection}
 #+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
 #+LaTeX_HEADER: \usepackage[parfill]{parskip}
 #+LaTeX_HEADER:\usepackage{subfig}
@@ -27,23 +28,41 @@
 #+latex_header: \usepackage[none]{hyphenat}
 #+LATEX_HEADER_EXTRA:  \usepackage{framed}
 
+#+BEGIN_EXPORT latex
+  % Redefine the plain page style
+  \fancypagestyle{plain}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0pt}% Line at the header invisible
+    \rfoot{\thepage\ of \pageref{LastPage}}
+    \fancyfoot[CE,CO]{}
+  }
+
+  % \patchcmd{\chapter}{\thispagestyle{fancy}}{\thispagestyle{fancy}}{}{}
+
+#+END_EXPORT
 
 
 * Introduction
 <Waiting for Hugo>
 
+* TODO
+
+- [ ] Report on standard deviations and errors, would be very interesting to highlight changes in this from prim to domesticated.
+
 * Results
 
-
-Four key species, two diploid (Einkorn) and two tetraploid (Emmer) were selected to study the effect on grain morphology across domestication and polyploidisation. Domesticated  /T. monococcum/ and primitive /T. boeticum/ were selected for being diploid; Domesticated /T. dicoccum/ as primitive /T. dicoccoides/ were chosen as representative species for tetraploids. (See Figure 1)
+Previous research demonstrated that certain species of wheat underwent a significant (a two-thirds increase) biomass shift during domestication cite:Waines2007. Several more studies have confirmed the expected grain filling, volume and size change undergone during domestication cite:Gupta2006,Piperno2004, but have been unable to provide detailed explanation of the effects leading to the observed changes in grain morphology.
 
 #+CAPTION: Einkorn (top) and Emmer (bottom) Wheat (Primitives left, Domesticated right)
 #+ATTR_LATEX: :width 8cm
 #+NAME: fig:wheat
 [[~/Dropbox/NPPC/Domestication/Figures/fig1.png]]
 
+Four key species, two diploid (Einkorn) and two tetraploid (Emmer) were selected to study the effect on grain morphology across domestication and polyploidisation. Domesticated  /T. monococcum/ and primitive /T. boeticum/ were selected for being diploid; Domesticated /T. dicoccum/ as primitive /T. dicoccoides/ were chosen as representative species for tetraploids. (See Figure 1)
 
-Key grain morphological traits were measured using micro-CT imaging, these include length, width, depth, volume, and surface area. From these traits, two additional descriptors were created LWD (Length X Width X Depth) and Surface area / Volume ratio these are used to provide insight to potential trait interactions.
+
+
+Key grain morphological traits were measured using micro-CT imaging, these include length, width, depth, volume, and surface area. From these traits, two additional descriptors were created LWD (Length X Width X Depth) and Surface area / Volume ratio these are used to provide insight to potential trait interactions. Of these traits, length and width have already been highlighted as having vital importance in building genetic frameworks for wheat cite:Gegas2010.
 
 Traits were gathered using image analysis software cite:Hughes2017, major modifications were made to grain identification algorithms in order to adapt to the wide variety in the species studied.
 
@@ -63,7 +82,6 @@ No noticeable change has been observed in the length attribute between domestica
 
 However, other traits(figure:2): length, width, depth, volume and surface area all have a significant change between wild and domesticated ($p<0.01$).
 
-\clearpage
 
 *** Principle Component Analysis
 A two component PCA reviled that no dominant trait appears to influence morphometric variation in einkorn species (figure:3).
@@ -80,14 +98,17 @@ With the exception of grain length (-0.24), all other measurements (width, depth
 *** Grain Traits
 With length, Emmer displays no significant difference in grain length between wild and domesticated species ($p=0.93$).
 
-Additionally, surface area of grain is reported as non-significant ($p=0.17$). Showing that grain compactness has significantly altered to preserve this trait (Figure: 4). The Bayesian model predicted a $20\%$ probability of domesticated and wild types differing, showing that there is an indication of change. Though, with a high enough probability of this being down to chance.
-
 #+CAPTION: Emmer Traits
 #+ATTR_LATEX: :width 9cm
 #+NAME: fig:pca
 [[~/Dropbox/NPPC/Domestication/Figures/fig4.png]]
 
+
+Additionally, surface area of grain is reported as non-significant ($p=0.17$). Showing that grain compactness has significantly altered to preserve this trait (Figure: 4). The Bayesian model predicted a $20\%$ probability of domesticated and wild types differing, showing that there is an indication of change. Though, with a high enough probability of this being down to chance.
+
+
 The traits width, depth and volume have all shown significant change during Emmer domestication ($p<0.01$).
+
 
 *** Principle Component Analysis
 
@@ -101,9 +122,53 @@ A two component PCA, with PC1 and PC2 providing 78% and 15% respectively, shows 
 The second principle component, with much less explanation, shows that the interaction between length, width and depth is much less important in explaining variance whilst length alone ($coef=0.72$) provides significant coverage.
 
 
+** Ploidy Effects
+
+*** Wilds
+In grain length, wild einkorn and wild emmer have shown to be just overlapping ($p=0.025$) with a $9.4\%$ probability of similar means (Figure: 6).
+
+Width follows a similar pattern with length, being non-significant ($p=0.02$). A high probability exists that the averages of these wild types are similar ($27\%$ probability).
+
+Grain depth, volume and surface area all report highly significant changes across ploidy ($p<0.01$).
+
+
+#+CAPTION: Ploidy Effects
+#+ATTR_LATEX: :width 9cm
+#+NAME: fig:ployeff
+[[~/Dropbox/NPPC/Domestication/Figures/dom-True.png]]
+
+
+*** Domesticates
+
+Between 2N and 4N domesticated species all grain parameters (length, width, depth, volume and surface area) are shown to have a highly significant change ($p<0.01$).
+
+Whilst statistically significant, grain width has shown a high probability of $28\%$, that the mean between 2N and 4N overlaps. A wide standard deviation in einkorn provides this confusion.
+
+All other measurements show a $<5\%$ probability of overlapping values.
+
+
+** Modelling
+
+A multiple regression model was used to obtain predictions of domestication using three key parameters (grain length, width and depth). A high variance was explained ($R^2=0.95$) using equation 1 and an ordinary least squares method (OLS).
+
+$$ Y = \beta_0 + \times \beta_1 length \times \beta_2 depth \times \beta_3 width  + \epsilon $$
+
+Here, in addition to domestication status this model has differentiated across ploidy. Wild and primitives of einkorn and emmer are accurately predicted (figure:[[fig:reg]]).
+
+#+CAPTION: is showing a multiple regression of R=0.95 by using length, width and depth to correctly ID domestication status.
+#+ATTR_LATEX: :width 9cm
+#+NAME: fig:reg
+[[~/Dropbox/NPPC/Domestication/Figures/Suppl/Reg_Dom.png]]
+
+The model produced an R2 value by using the sum of data variance over the explained sum of squares:
+
+$$1- \frac{\sum\limits_{i=0}^{n}{r^2}}{\sum\limits_{i=0}^{n}{(y_i - \overline{y})^2 }}$$
+
+
+
 * Methods
 ** Materials
- < Plants which were used > ...
+   < Plants which were used > ...
 *** How they were sourced
 *** Any additional information
 
@@ -135,7 +200,7 @@ The scanning and MATLAB routine pipeline:
 
 *** Morphometric Features
 
- The features/phenotypes used are extracted during the imaging process.
+The features/phenotypes used are extracted during the imaging process.
 
  - Length is calculated using the major axis of the whole grain.
  - Width and depth are the major and minor axis of a cross section, found by selecting the grain's midpoint.
@@ -176,30 +241,13 @@ From Krusches' method a percentage likelihood of difference is produced.
 
 A linear model allowed for an R^2 value of 0.91 in einkorn species when predicting domestication status.
 
-*** Draft Supplemental figure for dom
-
-#+CAPTION: is showing a multiple regression of r=.91 by using length, width and depth to correctly ID domestication status.
-#+ATTR_LATEX: :width 9cm
-#+NAME: fig:reg
-[[~/Dropbox/NPPC/Domestication/Figures/Suppl/Reg_Dom.png]]
-
-
 *** Draft Supplemental figure for volume
 #+CAPTION: Showing the importance of 3rd dimension of depth
 #+ATTR_LATEX: :width 9cm
 #+NAME: fig:reg2
 [[~/Dropbox/NPPC/Domestication/Figures/Suppl/Regression_Analysis_Vol.png]]
 
-*** Least Squares Model
 
-Equation, where the intercept (\beta_0) has been set by surface area
-
-$$ Y = \beta_0 + \times \beta_1 length \times \beta_2 depth \times \beta_3 width  + \epsilon $$
-
-*** Misc
-The model produced an r^2 value by:
-
-$$1- \frac{\sum\limits_{i=0}^{n}{r^2}}{\sum\limits_{i=0}^{n}{(y_i - \overline{y})^2 }}$$
 
 
 

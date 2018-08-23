@@ -295,7 +295,7 @@ def do_analysis(df, compare_groups, atts):
 
 if __name__ == "__main__":
     # give data locations
-    dloc = '/home/nathan/Dropbox/NPPC/Domestication/Analysis/Data'
+    dloc = '/home/nathan/Dropbox/NPPC/Domestication/Analysis/Data/'
     dinfo = '/home/nathan/Dropbox/NPPC/Domestication/Analysis/info.xlsx'
 
     # select attributes we are interested in
@@ -305,55 +305,33 @@ if __name__ == "__main__":
     data = ctd(dloc, True)
     # add spike info
     data.get_spike_info(dinfo)
-    # fix colnames
+
+    # fix colnames (sometimes they're wrong and have bad characters)
     data.fix_colnames()
+
+    # remove bottom 0.025% and top 0.025% of data as they are often errors
     data.clean_data(remove_large=True, remove_small=True)
-    data.clean_data(remove_large=True, remove_small=True)
+
+    # If the data file provided has "top" and "bottom" in columns then as well as rachis files
+    # this will try it's best to join
     data.join_spikes_by_rachis()
+
+    # Make averages for the given attributes
     data.aggregate_spike_averages(atts, 'Sample name')
 
     # extract just the data frame
     df = data.get_data()
 
-    # Add aggregated values to atts
-    atts.extend(['median_length', 'median_width', 'median_depth',
-                 'median_volume', 'median_surface_area',
-                 'median_length_depth_width', 'mean_length', 'mean_width', 'mean_depth',
-                 'mean_volume', 'mean_surface_area', 'mean_length_depth_width', 'std_length', 'std_width', 'std_depth', 'std_volume', 'std_length_depth_width'])
-
     # # Then start to compare
 
     # Remap the namings so that they display well in results
-    df['Sample Type'] = df['Sample Type'].map(
-        {'T_monococcum_': 'T. monococcum',
-         'T_monococcum_wild_': 'T. beoticum',
-         'T_dicoccum_': 'T. dicoccum',
-         'T_dicoccoides_': 'T. dicoccoides',
-         'T_aestivum_': 'T. aestivum',
-         'T_spelta_': 'T. spelta',
-         'T_durum_': 'T. durum',
-         'H_spontaneum_wild_': 'H. spontaneum',
-         'H_vulgare_': 'H. vulgare'})
-
-    writer = pd.ExcelWriter('../Aestivum.xlsx')
-
-    df[df['Sample Type'] == 'T. aestivum'].to_excel(writer)
-
-    writer.save()
-    writer.close()
-
-    # # Drop the na's
-    # compare_groups = [('T. monococcum', 'T. beoticum'),
-    #                   ('T. dicoccum', 'T. dicoccoides'),
-    #                   ('H. spontaneum', 'H. vulgare')]
-
-    # do_analysis(df, compare_groups, atts)
-    # for f in ['T. monococcum', 'T. beoticum', 'T. dicoccum', 'T. dicoccoides', 'H. spontaneum', 'H. vulgare']:
-    #     plot_all_spikes_by_geno(df, f)
-    #     plt.tight_layout()
-    #     plt.savefig('{0}.pdf'.format(f))
-    #     plt.close('all')
-
-    # #loc, r, p = make_plots(df, compare_groups, atts)
-
-    # make the multi fig
+    # df['Sample Type'] = df['Sample Type'].map(
+    #     {'T_monococcum_': 'T. monococcum',
+    #      'T_monococcum_wild_': 'T. beoticum',
+    #      'T_dicoccum_': 'T. dicoccum',
+    #      'T_dicoccoides_': 'T. dicoccoides',
+    #      'T_aestivum_': 'T. aestivum',
+    #      'T_spelta_': 'T. spelta',
+    #      'T_durum_': 'T. durum',
+    #      'H_spontaneum_wild_': 'H. spontaneum',
+    #      'H_vulgare_': 'H. vulgare'})

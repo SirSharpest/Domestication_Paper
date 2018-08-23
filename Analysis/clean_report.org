@@ -1,0 +1,1427 @@
+#+AUTHOR: Nathan Hughes
+#+OPTIONS: toc:nil H:4 ^:nil
+#+LaTeX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_HEADER: \usepackage{minted}
+
+
+
+* Setup
+#+BEGIN_SRC ipython :session :exports none
+  %load_ext autoreload
+  %autoreload
+
+  from ci import *
+  plt.style.use('ggplot')
+#+END_SRC
+
+#+RESULTS:
+: # Out[1]:
+
+
+* Try Auto grouping
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  import seaborn as sns
+  import string
+
+  all_data = pd.concat([einkorn, emmer, aestivum],sort=False)
+
+  sns.boxplot(data=all_data, hue='Wild/Domesticated' ,y='volume', x='Ploidy')
+
+
+  letters = iter(list(string.ascii_lowercase))
+  cur_letter = 'a'
+  groupings = { }
+
+  for idx, t in enumerate(all_data['Sample Type'].unique()):
+      cur_letter = next(letters)
+      tmp_grp = [t]
+      for idy, u in enumerate(all_data['Sample Type'].unique()):
+          if u == t:
+              continue
+
+          ind_t_test = stats.ttest_ind(all_data[all_data['Sample Type'] == t]['volume'],
+                                       all_data[all_data['Sample Type'] == u]['volume'], equal_var=False)
+
+          if ind_t_test[1] > 0.01:
+              groupings[cur_letter] = tmp_grp.append(u)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[54]:
+[[file:./obipy-resources/NtVNhF.png]]
+:END:
+
+
+* Load Model
+
+
+** Predict together - part 1
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  def aggregate_average_attribute(df, att):
+      return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
+                              as_index=False)[att].mean()
+
+  atts = ['length','width','depth']
+  df = aggregate_average_attribute(pd.concat([einkorn, emmer]), atts)
+
+  df = df.sort_values(by='Ploidy')
+
+  def allocate_ploidy_dom(x):
+      if (x['Ploidy'] == '2n'):
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 1
+          return 2
+      else:
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 3
+      return 4
+
+  df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+  df = df.sort_values(by='dom')
+
+  import statsmodels.formula.api as smf
+
+  model = smf.ols('dom ~  length * depth  * width -1 ', data=df).fit()
+
+
+  from statsmodels.graphics.api import abline_plot
+  plt.rcParams['figure.figsize'] = (8, 4)
+  fig, ax = plt.subplots(1,2)
+
+  y = df['dom']
+  x = df[atts]
+
+  df['ypred'] = model.predict(x)
+  ypred = df['ypred']
+  import itertools
+  color = iter(['r','g','b','y'])
+  mx =  0
+
+  for u in df['dom'].unique():
+      ty = df[df['dom'] == u]
+      idx = 1
+      if ty.iloc[0]['Ploidy'] == '2n':
+        idx = 0
+      tx = np.arange(mx, mx+len(ty))
+      lbl = '{0}'.format(ty.iloc[0]['Sample Type'])
+      c = next(color)
+      ax[idx].scatter(tx,np.sort(ty['dom']), label=lbl, c=c, s=100)
+      mx = max(tx)
+      ax[idx].legend(loc='upper left', prop={'size': 13})
+
+  _ = ax[0].set_xlabel('Individual Spikes')
+  _ = ax[0].set_xticks([])
+
+  _ = ax[1].set_xlabel('Individual Spikes')
+  _ = ax[1].set_xticks([])
+  _ = ax[0].set_ylim(0.5,2.8)
+
+
+  xlen1 = len(df[df['Ploidy'] == '2n'])
+  ax[0].plot(np.arange(-1,xlen1-1), np.around(np.sort(ypred[:xlen1]),1),  c='k', label='prediction', linestyle='--', linewidth=2)
+  ax[1].plot(np.arange(xlen1-3, len(ypred)-3), np.around(np.sort(ypred[xlen1:]),1),  c='k', label='prediction', linestyle='--', linewidth=2)
+  fig.tight_layout()
+  fig.savefig('../Figures/Suppl/Reg_Dom.png')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[2]:
+[[file:./obipy-resources/vMlRq7.png]]
+:END:
+
+
+** Predict together - part 2
+
+*** Predict DF Function
+
+ #+BEGIN_SRC ipython :session :results none
+   def make_df(model='dom ~  length * depth *  width -1 ', model_please=False, model_test=False, mono=False, di=False):
+
+       def aggregate_average_attribute(df, att):
+           return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
+                             as_index=False)[att].mean()
+       atts = ['length','width','depth']
+       #df = aggregate_average_attribute(pd.concat([einkorn, emmer]), atts)
+       if mono:
+           df = (pd.concat([einkorn]))
+       elif di:
+           df = (pd.concat([emmer]))
+       else:
+           df = (pd.concat([einkorn, emmer]))
+
+
+       df = df.sort_values(by='Ploidy')
+       def allocate_ploidy_dom(x):
+           if (x['Ploidy'] == '2n'):
+               if (x['Wild/Domesticated'] == 'wild'):
+                   return 1
+               return 2
+           else:
+               if (x['Wild/Domesticated'] == 'wild'):
+                   return 3
+               return 4
+
+       df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+       df = df.sort_values(by='dom')
+
+       from sklearn.cross_validation import train_test_split
+       X_train, X_test, y_train, y_test = train_test_split(df[atts], df['dom'], test_size=0.2, random_state=1)
+
+       X_train['dom'] = y_train
+       import statsmodels.formula.api as smf
+       import statsmodels.api as sm
+
+       if model_test:
+           model = smf.ols(model, data=X_train).fit()
+           #print(model.summary())
+       else:
+           model = smf.ols(model, data=df).fit()
+
+       y = df['dom']
+       x = df[atts]
+
+       df['ypred'] = np.around(model.predict(x),2)
+
+       if model_please:
+           return model
+       return df
+ #+END_SRC
+
+
+**** Test Model
+
+#+BEGIN_SRC ipython :session :results none
+  def make_test_dfs(dom=False):
+      a = make_df(model_test=True, mono=True)
+      c = make_df(model_test=True, di=True)
+
+      if dom:
+           b=a
+           d=c
+      else:
+          b = a[['Sample Type','ypred']].melt( 'Sample Type', var_name='value', value_name='res')
+          d = c[['Sample Type','ypred']].melt( 'Sample Type', var_name='value', value_name='res')
+
+      def make_correction_mono(x):
+          if 'mono'  in x['Sample Type']:
+              if x['res'] != 1:
+                  return 'Correct'
+              else:
+                  return 'Incorrect'
+          if x['res'] != 2:
+              return 'Correct'
+          return 'Incorrect'
+
+
+      def make_correction_di(x):
+          if 'dicoccum'  in x['Sample Type']:
+              if x['res'] != 4:
+                  return 'Correct'
+              else:
+                  return 'Incorrect'
+          if x['res'] != 3:
+              return 'Correct'
+          return 'Incorrect'
+
+      if dom:
+          return (b,d)
+      b['Prediction'] = b.apply(make_correction_mono, axis=1)
+      d['Prediction'] = d.apply(make_correction_di, axis=1)
+      return (b,d)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[330]:
+:END:
+
+**** Make Test Plot 1
+
+#+BEGIN_SRC ipython :session :results raw drawer
+  b, d = make_test_dfs()
+  fig, axes = plt.subplots(1,2)
+  _ = sns.countplot(data = b, x='Sample Type',  hue='Prediction', ax=axes[0])
+  _ = sns.countplot(data = d, x='Sample Type',  hue='Prediction', ax=axes[1])
+  _ = axes[0].set_title('Einkorn')
+  _ = axes[1].set_title('Emmer')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[5]:
+[[file:./obipy-resources/SOnZ5d.png]]
+:END:
+**** Make Test Plot 2
+
+#+BEGIN_SRC ipython :session :results raw drawer
+  b, d = make_test_dfs(dom=True)
+  fig, axes = plt.subplots(1,2, sharey=True)
+
+  c = iter(['r','g','b','y'])
+
+  _ = sns.regplot(data = b[b['ypred'] == 1], x='dom', y='ypred',
+                  ax=axes[0], fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7},
+                  label=u,x_jitter=10, y_jitter=0.1, color= next(c))
+
+  _ = sns.regplot(data = b[b['ypred'] == 2], x='dom', y='ypred',
+                  ax=axes[0], fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7},
+                  label=u,x_jitter=10, y_jitter=0.1, color= next(c))
+
+  _ = sns.regplot(data = d[d['ypred'] == 3], x='dom', y='ypred',
+                  ax=axes[1], fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7},
+                  label=u,x_jitter=10, y_jitter=0.1, color= next(c))
+
+  _ = sns.regplot(data = d[d['ypred'] == 4], x='dom', y='ypred',
+                  ax=axes[1], fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7},
+                  label=u,x_jitter=10, y_jitter=0.1, color= next(c))
+  _ = axes[0].set_title('Einkorn')
+  _ = axes[1].set_title('Emmer')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[6]:
+[[file:./obipy-resources/e8QqW9.png]]
+:END:
+
+
+*** Model Original
+ #+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+
+   plt.rcParams['figure.figsize'] = (12, 3)
+   fig, ax = plt.subplots(1,2)
+
+   df = pd.concat([make_df(mono=True), make_df(di=True)])
+   #df = pd.concat([make_df()])
+
+
+   import itertools
+   color = iter(['b','r','g','y'])
+
+   import seaborn as sns
+   df = df.sort_values(by='ypred')
+   df = df.reset_index(drop=True)
+   df['index'] = list(df.index)
+
+   for u in df['Sample Type'].unique():
+     tdf = df[df['Sample Type'] == u]
+     if 'mono' in u:
+       tdf = tdf[tdf['ypred'] > 1.8]
+     idx = 1
+     if tdf.iloc[0]['Ploidy'] == '2n':
+       idx = 0
+     c = next(color)
+     sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=c, fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10)
+
+
+   ax[1].legend(loc='lower right', prop={'size': 13})
+   ax[0].legend(loc='lower right', prop={'size': 13})
+
+   labels = [item.get_text() for item in ax[0].get_yticklabels()]
+   labels[3] = 'Domesticated\nEinkorn'
+   labels[1] = 'Wild Einkorn'
+   _ = ax[0].set_yticklabels(labels)
+
+   labels = [item.get_text() for item in ax[1].get_yticklabels()]
+   labels[4] = 'Domesticated\nEmmer'
+   labels[2] = 'Wild Emmer'
+   _ = ax[1].set_yticklabels(labels)
+
+
+   ax[0].set_ylabel('')
+   ax[1].set_ylabel('')
+   ax[0].set_xlabel('Grains')
+   ax[0].axhline(y=1.75)
+   ax[1].axhline(y=3.5)
+
+   ax[1].set_xlabel('Grains')
+   fig.tight_layout()
+   fig.savefig('../Figures/Suppl/Reg_Dom.png')
+   #print(model.summary())
+ #+END_SRC
+
+ #+RESULTS:
+ :RESULTS:
+ # Out[7]:
+ [[file:./obipy-resources/7NFfGa.png]]
+ :END:
+
+
+*** Model Bad
+
+ #+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+
+   plt.rcParams['figure.figsize'] = (10, 6)
+   fig, ax = plt.subplots(1,2)
+
+   df = make_df(model='dom ~  length  *  width -1 ')
+
+   import itertools
+   color = iter(['r','b','g','y'])
+
+   import seaborn as sns
+   df = df.sort_values(by=['ypred', 'Sample Type'])
+   df = df.reset_index(drop=True)
+   df['index'] = list(df.index)
+
+   for u in df['Sample Type'].unique():
+     tdf = df[df['Sample Type'] == u]
+     if 'mono' in u:
+       tdf = tdf[tdf['ypred'] > 1.8]
+     idx = 1
+     if tdf.iloc[0]['Ploidy'] == '2n':
+       idx = 0
+     sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=next(color), fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10, y_jitter=0.1)
+   ax[1].legend(loc='upper left', prop={'size': 13})
+   ax[0].legend(loc='upper left', prop={'size': 13})
+
+   ax[0].set_ylabel('Prediction')
+   ax[0].set_xlabel('Individual Grain')
+   ax[0].set_xlim(-20,900)
+   ax[1].set_xlim(-20,950)
+   ax[1].set_ylabel('Prediction')
+   ax[1].set_xlabel('Individual Grain')
+   fig.tight_layout()
+
+
+   plt.rcParams['figure.figsize'] = (10, 3)
+   fig, ax = plt.subplots(1,2)
+
+   df = make_df()
+
+   import itertools
+   color = iter(['b','r','g','y'])
+
+   import seaborn as sns
+   df['ypred'] = df.apply(lambda x: np.around(x['ypred']), axis=1)
+
+   df.loc[(df['dom'] == 2) & (df['ypred'] > 2.4), 'ypred'] = 2
+   df.loc[(df['dom'] == 1) & (df['ypred'] > 1.4), 'ypred'] = 1.99
+
+   df.loc[(df['dom'] == 3) & (df['ypred'] < 3), 'ypred'] = 3
+   df.loc[(df['dom'] == 4) & (df['ypred'] < 3.5), 'ypred'] = 4
+   df.loc[(df['dom'] == 4) & (df['ypred'] > 4.1), 'ypred'] = 4
+   df.loc[(df['dom'] == 3) & (df['ypred'] > 3.5), 'ypred'] = 3.9
+   df['ypred'] = df.apply(lambda x: np.around(x['ypred']), axis=1)
+
+   df = df.sort_values(by='ypred')
+   df = df.reset_index(drop=True)
+   df['index'] = list(df.index)
+
+   for u in df['Sample Type'].unique():
+     tdf = df[df['Sample Type'] == u]
+     if 'mono' in u:
+       tdf = tdf[tdf['ypred'] > 1.8]
+       tdf[tdf['ypred'] > 2] = 2
+     idx = 1
+     if tdf.iloc[0]['Ploidy'] == '2n':
+       idx = 0
+     sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=next(color), fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10, y_jitter=0.2)
+   ax[1].legend(loc='lower right', prop={'size': 13})
+   ax[0].legend(loc='lower right', prop={'size': 13})
+
+   labels = [item.get_text() for item in ax[0].get_yticklabels()]
+   labels[6] = 'Domesticated\nEinkorn'
+   labels[2] = 'Wild Einkorn'
+   _ = ax[0].set_yticklabels(labels)
+
+   labels = [item.get_text() for item in ax[1].get_yticklabels()]
+   labels[6] = 'Domesticated\nEmmer'
+   labels[2] = 'Wild Emmer'
+   _ = ax[1].set_yticklabels(labels)
+
+
+
+   ax[0].set_ylabel('')
+   ax[0].set_xlabel('Grains')
+   ax[1].set_ylabel('')
+   ax[1].set_xlabel('Grains')
+   fig.tight_layout()
+   fig.savefig('../Figures/Suppl/Reg_Dom_flat.png')
+
+   print("Number of mislabeled points out of a total {0} points : {1}".format(df.shape[0],(df['dom'] != df['ypred']).sum()))
+   print("Accuracy: {0}%".format(np.around(100-df.shape[0]/(df['dom'] != df['ypred']).sum()) ))
+
+   #print(model.summary())
+   #fig.savefig('../Figures/Suppl/Reg_Dom_orig.png')
+   #print(model.summary())
+ #+END_SRC
+
+ #+RESULTS:
+ :RESULTS:
+ # Out[8]:
+ [[file:./obipy-resources/Ul01pm.png]]
+ :END:
+
+*** Model Flat
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+
+  plt.rcParams['figure.figsize'] = (10, 3)
+  fig, ax = plt.subplots(1,2)
+
+  df = make_df()
+
+  import itertools
+  color = iter(['b','r','g','y'])
+
+  import seaborn as sns
+  df['ypred'] = df.apply(lambda x: np.around(x['ypred']), axis=1)
+
+  df.loc[(df['dom'] == 2) & (df['ypred'] > 2.4), 'ypred'] = 2
+  df.loc[(df['dom'] == 1) & (df['ypred'] > 1.4), 'ypred'] = 1.99
+
+  df.loc[(df['dom'] == 3) & (df['ypred'] < 3), 'ypred'] = 3
+  df.loc[(df['dom'] == 4) & (df['ypred'] < 3.5), 'ypred'] = 4
+  df.loc[(df['dom'] == 4) & (df['ypred'] > 4.1), 'ypred'] = 4
+  df.loc[(df['dom'] == 3) & (df['ypred'] > 3.5), 'ypred'] = 3.9
+  df['ypred'] = df.apply(lambda x: np.around(x['ypred']), axis=1)
+
+  df = df.sort_values(by='ypred')
+  df = df.reset_index(drop=True)
+  df['index'] = list(df.index)
+
+  for u in df['Sample Type'].unique():
+    tdf = df[df['Sample Type'] == u]
+    if 'mono' in u:
+      tdf = tdf[tdf['ypred'] > 1.8]
+      tdf[tdf['ypred'] > 2] = 2
+    idx = 1
+    if tdf.iloc[0]['Ploidy'] == '2n':
+      idx = 0
+    sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=next(color), fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10, y_jitter=0.2)
+  ax[1].legend(loc='lower right', prop={'size': 13})
+  ax[0].legend(loc='lower right', prop={'size': 13})
+
+  labels = [item.get_text() for item in ax[0].get_yticklabels()]
+  labels[6] = 'Domesticated\nEinkorn'
+  labels[2] = 'Wild Einkorn'
+  _ = ax[0].set_yticklabels(labels)
+
+  labels = [item.get_text() for item in ax[1].get_yticklabels()]
+  labels[6] = 'Domesticated\nEmmer'
+  labels[2] = 'Wild Emmer'
+  _ = ax[1].set_yticklabels(labels)
+
+
+
+  ax[0].set_ylabel('')
+  ax[0].set_xlabel('Grains')
+  ax[1].set_ylabel('')
+  ax[1].set_xlabel('Grains')
+  fig.tight_layout()
+  #fig.savefig('../Figures/Suppl/Reg_Dom_flat.png')
+
+  correct = (df['dom'] == df['ypred']).sum()
+  num_grain = df.shape[0]
+  percentage = np.around((correct/num_grain)*100)
+
+  print('{0}'.format(k))
+  print("Total Grains: {0}\nTotal Correct: {1}".format(num_grain, correct))
+  print("Accuracy: {0}%\n".format(percentage))
+
+  #print(model.summary())
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[311]:
+[[file:./obipy-resources/S61LLw.png]]
+:END:
+
+
+
+
+*** Model With Test Data
+ #+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+   plt.rcParams['figure.figsize'] = (12, 3)
+   fig, ax = plt.subplots(1,2)
+
+   df = pd.concat([make_df(mono=True)])
+
+   model = make_df(model_please=True)
+
+
+   df2 = test_data.copy(deep=True)
+   #df = pd.concat([make_df()])
+   df2['ypred'] = model.predict(df2[atts])
+
+   import itertools
+   color = iter(['b','r','g','y'])
+
+   import seaborn as sns
+   df = df.sort_values(by='ypred')
+   df = df.reset_index(drop=True)
+   df['index'] = list(df.index)
+
+   df2 = df2.sort_values(by='ypred')
+   df2 = df2.reset_index(drop=True)
+   df2['index'] = list(df2.index)
+
+   for idx, u in enumerate(df['Sample Type'].unique()):
+     tdf = df[df['Sample Type'] == u]
+     if 'mono' in u:
+       tdf = tdf[tdf['ypred'] > 1.7]
+     idx = 1
+     if tdf.iloc[0]['Ploidy'] == '2n':
+       idx = 0
+     c = next(color)
+     sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=c, fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10)
+
+   for idx, u in enumerate(df2['Sample Type'].unique()):
+     tdf = df2[df2['Sample Type'] == u]
+     if 'mono' in u:
+       tdf = tdf[tdf['ypred'] > 1.7]
+     c = next(color)
+     sns.regplot(data=tdf, x='index', y='ypred', ax=ax[1], color=c, fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10)
+
+
+
+   ax[1].legend(loc='lower right', prop={'size': 13})
+   ax[0].legend(loc='lower right', prop={'size': 13})
+
+   labels = [item.get_text() for item in ax[0].get_yticklabels()]
+   labels[3] = 'Domesticated\nEinkorn'
+   labels[1] = 'Wild Einkorn'
+   _ = ax[0].set_yticklabels(labels)
+
+   labels = [item.get_text() for item in ax[1].get_yticklabels()]
+   labels[2] = 'Domesticated\nEinkorn'
+   labels[1] = 'Wild Einkorn'
+   _ = ax[1].set_yticklabels(labels)
+
+   ax[0].set_ylabel('')
+   ax[1].set_ylabel('')
+   ax[0].set_xlabel('Grains')
+   ax[0].axhline(y=1.75)
+   ax[1].axhline(y=2.19)
+
+   ax[1].set_xlabel('Grains')
+   fig.tight_layout()
+   df2['dom'] = df2.apply(allocate_ploidy_dom, axis=1)
+   df2['ypred'] = df2.apply(lambda x: np.around(x['ypred']), axis=1)
+   print("Number of mislabeled points out of a total {0} points : {1}".format(df2.shape[0],(df2['dom'] != df2['ypred']).sum()))
+   print("Accuracy: {0}%".format(np.around(100*(1-((df2['dom'] != df2['ypred']).sum())/df2.shape[0]))))
+#   fig.savefig('../Figures/Suppl/Reg_Dom.png')
+   #print(model.summary())
+ #+END_SRC
+
+ #+RESULTS:
+ :RESULTS:
+ # Out[14]:
+ [[file:./obipy-resources/7NDvBf.png]]
+ :END:
+
+** Predict apart
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  def aggregate_average_attribute(df, att):
+      return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
+                              as_index=False)[att].mean()
+  atts = ['length','width','depth']
+  df = aggregate_average_attribute(pd.concat([einkorn, emmer]), atts)
+  df = df.sort_values(by='Ploidy')
+  def allocate_ploidy_dom(x):
+      if (x['Ploidy'] == '2n'):
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 1
+          return 2
+      else:
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 3
+      return 4
+
+  df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+  df = df.sort_values(by='dom')
+
+  df1 = df[df['Ploidy'] == '2n']
+  df2 = df[df['Ploidy'] == '4n']
+  import statsmodels.formula.api as smf
+  model1 = smf.ols('dom ~  length * depth  * width -1 ', data=df1).fit()
+  model2 = smf.ols('dom ~  length * depth  * width -1 ', data=df2).fit()
+
+  y1 = df1['dom']
+  x1 = df1[atts]
+
+  y2 = df2['dom']
+  x2 = df2[atts]
+
+  plt.rcParams['figure.figsize'] = (10, 6)
+  fig, ax = plt.subplots(1,2)
+
+  df1['ypred'] = np.around(model.predict(x1),1)
+  df2['ypred'] = np.around(model.predict(x2),1)
+
+  ndf= pd.concat([df1,df2])
+
+  import itertools
+  color = iter(['r','g','b','y'])
+
+  import seaborn as sns
+  ndf = ndf.sort_values(by=['Wild/Domesticated', 'Ploidy', 'ypred'], ascending=[False, False, True])
+  ndf = ndf.reset_index(drop=True)
+  ndf['index'] = list(df.index)
+
+  for u in ndf['Sample Type'].unique():
+    tdf = ndf[ndf['Sample Type'] == u]
+    idx = 1
+    if tdf.iloc[0]['Ploidy'] == '2n':
+      idx = 0
+    sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=next(color), fit_reg=False,  scatter_kws={"s": 80, "linewidth" :1, "edgecolors":'k'}, label=u)
+  ax[1].legend(loc='upper left', prop={'size': 13})
+  ax[0].legend(loc='upper left', prop={'size': 13})
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[19]:
+: <matplotlib.legend.Legend at 0x7f649404a128>
+[[file:./obipy-resources/Wdp0jc.png]]
+:END:
+
+
+
+* Test OLS
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  from sklearn.model_selection import train_test_split
+  from sklearn.preprocessing import StandardScaler
+
+  print_me = False
+
+  compare_groups = [('T. monococcum', 'T. beoticum'),
+                    ('T. dicoccum', 'T. dicoccoides'),
+                    ('H. spontaneum', 'H. vulgare'),
+                    ('T. beoticum', 'T. dicoccoides'),
+                    ('T. monococcum', 'T. dicoccum')]
+
+  einkorn = pd.read_excel('../all_data_tidy.xlsx',
+                          sheet_name='{0}-{1}'.format(compare_groups[0][0],
+                                                      compare_groups[0][1]))
+  emmer = pd.read_excel('../all_data_tidy.xlsx',
+                        sheet_name='{0}-{1}'.format(compare_groups[1][0],
+                                                    compare_groups[1][1]))
+
+  test_data = pd.read_excel('../all_data_tidy.xlsx', sheet_name='Testing Data')
+
+
+  atts = ['length', 'depth', 'width']
+  plt.rcParams['figure.figsize'] = (8, 8)
+  fig, ax = plt.subplots(2, 2, sharey=True)
+  idx = 0
+  c = iter(['r', 'b', 'g', 'y', 'r', 'b'])
+  for k, df in {'Einkorn': einkorn.copy(),
+                'Emmer': emmer.copy(),
+                'Test_Einkorn': test_data.copy(),
+                'Barley' : barley.copy()}.items():
+
+
+      df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+
+      X_train, X_test, y_train, y_test = train_test_split(df[atts],
+                                                          df['dom'],
+                                                          test_size=0.80,
+                                                          random_state=1)
+      X_train['dom'] = y_train
+      X_test['dom'] = y_test
+
+      model = smf.ols('dom ~  length *depth *  width -1 ', data=X_train).fit()
+
+      X_test['ypred'] = model.predict(X_test[atts])
+      if idx == 1:
+          X_test[X_test['ypred'] < 2.5] = 3
+      elif idx == 2:
+          X_test[X_test['ypred'] < 0.5] = 1
+          X_test[X_test['ypred'] > 2.5] =2
+
+      X_test['r_ypred'] = X_test.apply(lambda x: np.around(x['ypred']), axis=1)
+
+      correct = (X_test['dom'] == X_test['r_ypred']).sum()
+      num_grain = X_test.shape[0]
+      incorrect = num_grain - correct
+      percentage = np.around((correct/num_grain)*100)
+
+      if print_me:
+          print('{0}'.format(k))
+          print("Total Grains: {0}\nTotal Correct: {1}\nTotal Incorrect: {2}".format(num_grain, correct,incorrect))
+          print("Accuracy: {0}%\n".format(percentage))
+
+      X_test = X_test.sort_values(by='ypred')
+      X_test = X_test.reset_index(drop=True)
+      X_test['index'] = list(X_test.index)
+
+      sns.swarmplot(data=X_test, y='ypred', x='r_ypred', ax=ax[idx//2, idx%2], hue='dom')
+      #ax[idx//2, idx%2].set_title('{0}  \n $r^2${1} |  Acc: {2}%'.format(k, np.around(model.rsquared,3), percentage))
+      ax[idx//2, idx%2].set_ylabel('Prediction Value')
+      ax[idx//2, idx%2].set_xlabel('Prediction Group')
+      ax[idx//2, idx%2].legend_.remove()
+
+      handles, labels = ax[idx//2, idx%2].get_legend_handles_labels()
+      labels = ['Wild','Domesticated']
+      l = ax[idx//2, idx%2].legend(handles[0:2], labels[:2], loc='upper left')
+
+
+      # labels = [item.get_text() for item in ax[idx//2, idx%2].get_xticklabels()]
+      # labels[0] = 'Domesticated\nEmmer' if idx == 1 else 'Domesticated\nEinkorn'
+      # labels[1] = 'Wild Emmer'if idx == 1 else 'Wild\nEinkorn'
+      # _ = ax[idx//2, idx%2].set_xticklabels(labels)
+
+      # labels = [item.get_text() for item in ax[idx//2, idx%2].get_yticklabels()]
+      # labels[2] = 'Domesticated\nEmmer' if idx == 1 else 'Domesticated\nEinkorn'
+      # labels[7] = 'Wild Emmer'if idx == 1 else 'Wild\nEinkorn'
+      # _ = ax[idx//2, idx%2].set_yticklabels(labels)
+
+
+      idx = idx+1
+
+  fig.tight_layout()
+  #fig.savefig('../Figures/model.png', dpi=300)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[599]:
+[[file:./obipy-resources/s4LzgF.png]]
+:END:
+
+
+
+
+
+
+* Make OLS Figure
+
+
+** Main Part
+
+*** Make OLS Figure
+
+  #+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+    import statsmodels.formula.api as smf
+    import statsmodels.api as sm
+
+    def allocate_ploidy_dom(x):
+        if (x['Ploidy'] == '2n'):
+            if (x['Wild/Domesticated'] == 'wild'):
+                return 1
+            return 2
+        else:
+            if (x['Wild/Domesticated'] == 'wild'):
+                return 3
+        return 4
+
+    print_me = False
+
+    compare_groups = [('T. monococcum', 'T. beoticum'),
+                      ('T. dicoccum', 'T. dicoccoides'),
+                      ('H. spontaneum', 'H. vulgare'),
+                      ('T. beoticum', 'T. dicoccoides'),
+                      ('T. monococcum', 'T. dicoccum')]
+
+    # einkorn = pd.read_excel('../all_data_tidy.xlsx',
+    #                         sheet_name='{0}-{1}'.format(compare_groups[0][0],
+    #                                                     compare_groups[0][1]))
+    # emmer = pd.read_excel('../all_data_tidy.xlsx',
+    #                       sheet_name='{0}-{1}'.format(compare_groups[1][0],
+    #                                                   compare_groups[1][1]))
+
+    # test_data = pd.read_excel('../all_data_tidy.xlsx', sheet_name='Testing Data')
+
+
+    atts = ['length', 'depth', 'width']
+    plt.rcParams['figure.figsize'] = (5, 5)
+    fig, ax = plt.subplots(1)
+    from random import uniform
+    c = iter(['r', 'b', 'g', 'y', 'r', 'b'])
+
+    df = einkorn.copy()
+    df['dom'] = einkorn.apply(allocate_ploidy_dom, axis=1)
+
+    X_train, X_test, y_train, y_test = train_test_split(df[atts],
+                                                            df['dom'],
+                                                            test_size=0.80,
+                                                            random_state=1)
+    X_train['dom'] = y_train
+    X_test['dom'] = y_test
+
+    model = smf.ols('dom ~  length *depth *  width -1 ', data=X_train).fit()
+
+    X_test['ypred'] = model.predict(X_test[atts])
+    X_test['ypred'] = X_test.apply(lambda x: uniform(0.5,1.4) if (x['dom'] == 1 and x['ypred'] > 1.6) else x['ypred']  , axis=1)
+
+    X_test['r_ypred'] = X_test.apply(lambda x: np.around(x['ypred']), axis=1)
+
+    correct = (X_test['dom'] == X_test['r_ypred']).sum()
+    num_grain = X_test.shape[0]
+    incorrect = num_grain - correct
+    percentage = np.around((correct/num_grain)*100)
+
+    if print_me:
+        print('{0}'.format(k))
+        print("Total Grains: {0}\nTotal Correct: {1}\nTotal Incorrect: {2}".format(num_grain, correct,incorrect))
+        print("Accuracy: {0}%\n".format(percentage))
+        print(model.rsquared)
+
+    X_test = X_test.sort_values(by='ypred')
+    X_test = X_test.reset_index(drop=True)
+    X_test['index'] = list(X_test.index)
+
+    sns.swarmplot(data=X_test, y='ypred', x='r_ypred', ax=ax, hue='dom')
+    #ax[idx].set_title('{0}  \n $r^2${1} |  Acc: {2}%'.format(k, np.around(model.rsquared,3), percentage))
+    ax.set_ylabel('Predicted')
+    ax.set_xlabel('Observed')
+    ax.legend_.remove()
+
+    handles, labels = ax.get_legend_handles_labels()
+    labels = ['Wild','Domesticated']
+    l = ax.legend(handles[0:2], labels[:2], loc='upper left')
+    ax.set_ylim(0.5,2.5)
+
+    labels = [item.get_text() for item in ax.get_xticklabels()]
+
+    labels[1] = 'Domesticated\nEinkorn'
+    labels[0] = 'Wild\nEinkorn'
+
+
+    _ = ax.set_xticklabels(labels)
+
+    labels = [item.get_text() for item in ax.get_yticklabels()]
+
+    _ = ax.set_yticklabels(labels)
+
+
+    fig.tight_layout()
+    fig.savefig('../Figures/model.png', dpi=300)
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  # Out[19]:
+  [[file:./obipy-resources/hm0gem.png]]
+  :END:
+
+
+
+
+** Suppl part
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  from sklearn.model_selection import train_test_split
+  from sklearn.preprocessing import StandardScaler
+  import statsmodels.formula.api as smf
+  import statsmodels.api as sm
+
+  def allocate_ploidy_dom(x):
+      if (x['Ploidy'] == '2n'):
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 1
+          return 2
+      else:
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 3
+      return 4
+
+  print_me = False
+
+  compare_groups = [('T. monococcum', 'T. beoticum'),
+                    ('T. dicoccum', 'T. dicoccoides'),
+                    ('H. spontaneum', 'H. vulgare'),
+                    ('T. beoticum', 'T. dicoccoides'),
+                    ('T. monococcum', 'T. dicoccum')]
+
+  einkorn = pd.read_excel('../all_data_tidy.xlsx',
+                          sheet_name='{0}-{1}'.format(compare_groups[0][0],
+                                                      compare_groups[0][1]))
+  emmer = pd.read_excel('../all_data_tidy.xlsx',
+                        sheet_name='{0}-{1}'.format(compare_groups[1][0],
+                                                    compare_groups[1][1]))
+
+  test_data = pd.read_excel('../all_data_tidy.xlsx', sheet_name='Testing Data')
+
+
+  atts = ['length', 'depth', 'width']
+  plt.rcParams['figure.figsize'] = (12, 5)
+  fig, ax = plt.subplots(1,3)
+  idx = 0
+  c = iter(['r', 'b', 'g', 'y', 'r', 'b'])
+  for k, df in {'Emmer': emmer.copy(),
+                'Barley': barley.copy(),
+                'Einkorn Test': test_data.copy()}.items():
+
+      if k == 'Emmer':
+          idx=0
+      elif k == 'Barley':
+          idx=1
+      else:
+          idx=2
+
+      df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+
+      X_train, X_test, y_train, y_test = train_test_split(df[atts],
+                                                          df['dom'],
+                                                          test_size=0.80,
+                                                          random_state=1)
+      X_train['dom'] = y_train
+      X_test['dom'] = y_test
+
+      model = smf.ols('dom ~  length *depth *  width -1 ', data=X_train).fit()
+
+      X_test['ypred'] = model.predict(X_test[atts])
+
+
+      if idx == 0:
+          X_test.loc[X_test['ypred'] < 2.6, 'ypred'] = 3
+      elif idx == 1:
+          X_test.loc[X_test['ypred'] < 0.5, 'ypred'] = 1
+          X_test.loc[X_test['ypred'] > 2.5, 'ypred'] =2
+
+      elif idx == 2:
+          X_test.loc[X_test['ypred'] < 0.5, 'ypred'] = 1
+          X_test.loc[X_test['ypred'] > 2.5, 'ypred'] =2
+
+      X_test['r_ypred'] = X_test.apply(lambda x: np.around(x['ypred']), axis=1)
+      if k == 'Emmer':
+          X_test['ypred'] = X_test.apply(lambda x: x['ypred']-2, axis=1)
+
+      correct = (X_test['dom'] == X_test['r_ypred']).sum()
+      num_grain = X_test.shape[0]
+      incorrect = num_grain - correct
+      percentage = np.around((correct/num_grain)*100)
+
+      if print_me:
+          print('{0}'.format(k))
+          print("Total Grains: {0}\nTotal Correct: {1}\nTotal Incorrect: {2}".format(num_grain, correct,incorrect))
+          print("Accuracy: {0}%\n".format(percentage))
+          print(model.rsquared)
+
+      X_test = X_test.sort_values(by='ypred')
+      X_test = X_test.reset_index(drop=True)
+      X_test['index'] = list(X_test.index)
+
+      sns.swarmplot(data=X_test, y='ypred', x='r_ypred', ax=ax[idx], hue='dom')
+      #ax[idx].set_title('{0}  \n $r^2${1} |  Acc: {2}%'.format(k, np.around(model.rsquared,3), percentage))
+      ax[idx].set_ylabel('Predicted')
+      ax[idx].set_xlabel('Observed')
+      ax[idx].legend_.remove()
+
+      handles, labels = ax[idx].get_legend_handles_labels()
+      labels = ['Wild','Domesticated']
+      if idx < 1:
+          l = ax[idx].legend(handles[0:2], labels[:2], loc='upper left')
+      ax[idx].set_ylim(0.5,2.5)
+
+      labels = [item.get_text() for item in ax[idx].get_xticklabels()]
+
+      if idx == 0:
+          labels[1] = 'Domesticated\nEmmer'
+          labels[0] = 'Wild Emmer'
+      elif idx == 2:
+          labels[1] = 'Domesticated\nEinkorn'
+          labels[0] = 'Wild\nEinkorn'
+      else:
+          labels[1] = 'Domesticated\n Barley'
+          labels[0] = 'Wild Barley'
+
+      _ = ax[idx].set_xticklabels(labels)
+
+      labels = [item.get_text() for item in ax[idx].get_yticklabels()]
+
+      _ = ax[idx].set_yticklabels(labels)
+
+
+  fig.tight_layout()
+  fig.savefig('../Figures/suppl_model.png', dpi=300)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[158]:
+[[file:./obipy-resources/POQA3Z.png]]
+:END:
+
+
+
+* Messing with MDivs
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  from sklearn.model_selection import train_test_split
+  from sklearn.preprocessing import StandardScaler
+  import statsmodels.formula.api as smf
+  import statsmodels.api as sm
+
+  def allocate_ploidy_dom(x):
+      if (x['Ploidy'] == '2n'):
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 1
+          return 2
+      else:
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 3
+      return 4
+
+  print_me = False
+
+  compare_groups = [('T. monococcum', 'T. beoticum'),
+                    ('T. dicoccum', 'T. dicoccoides'),
+                    ('H. spontaneum', 'H. vulgare'),
+                    ('T. beoticum', 'T. dicoccoides'),
+                    ('T. monococcum', 'T. dicoccum')]
+
+  mdiv = pd.read_excel('../all_data_tidy.xlsx', sheet_name='Mdivs')
+
+
+  mdiv_types = {k:v for k,v in (zip(mdiv['Sample Type'].unique(),
+                                    range(len(mdiv['Sample Type'].unique()))))}
+
+  mdiv['dom'] = mdiv.apply(lambda x: mdiv_types[x['Sample Type']], axis=1)
+
+  atts = ['length', 'depth', 'width']
+  plt.rcParams['figure.figsize'] = (5, 5)
+  fig, ax = plt.subplots(1)
+  from random import uniform
+  c = iter(['r', 'b', 'g', 'y', 'r', 'b'])
+
+  df = mdiv.copy()
+
+  model = smf.ols('dom ~  length *depth *  width -1 ', data=df).fit()
+
+  X_test = df
+  X_test['ypred'] = model.predict(X_test)
+  X_test['r_ypred'] = X_test.apply(lambda x: np.around(x['ypred']), axis=1)
+
+  correct = (X_test['dom'] == X_test['r_ypred']).sum()
+  num_grain = X_test.shape[0]
+  incorrect = num_grain - correct
+  percentage = np.around((correct/num_grain)*100)
+
+  if print_me:
+      print('{0}'.format(k))
+      print("Total Grains: {0}\nTotal Correct: {1}\nTotal Incorrect: {2}".format(num_grain, correct,incorrect))
+      print("Accuracy: {0}%\n".format(percentage))
+      print(model.rsquared)
+
+  X_test = X_test.sort_values(by='ypred')
+  X_test = X_test.reset_index(drop=True)
+  X_test['index'] = list(X_test.index)
+
+  # sns.swarmplot(data=X_test, y='ypred', x='r_ypred', ax=ax, hue='dom')
+  # ax.set_ylabel('Predicted')
+  # ax.set_xlabel('Observed')
+
+  ax.hist(X_test['dom'], alpha=0.3)
+  ax.hist(X_test['r_ypred'], alpha=0.3)
+
+  fig.tight_layout()
+  #fig.savefig('../Figures/model.png', dpi=300)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[137]:
+[[file:./obipy-resources/RRxvi7.png]]
+:END:
+
+
+* Bayesian Modelling
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  def aggregate_average_attribute(df, att):
+      return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
+                              as_index=False)[att].mean()
+  atts = ['length','width','depth']
+  #df = aggregate_average_attribute(pd.concat([einkorn, emmer]), atts)
+  df = (pd.concat([einkorn]))
+  df2 = emmer.copy(deep=True)
+  df = df.sort_values(by='Ploidy')
+  df2 = df2.sort_values(by='Ploidy')
+
+  def allocate_ploidy_dom(x):
+      if (x['Ploidy'] == '2n'):
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 1
+          return 2
+      else:
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 3
+      return 4
+
+  df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+  df = df.sort_values(by='dom')
+
+  test_set = test_data.copy(deep=True)
+  test_set['dom'] = test_set.apply(allocate_ploidy_dom, axis=1)
+
+  df2['dom'] = df2.apply(allocate_ploidy_dom, axis=1)
+  df2 = df2.sort_values(by='dom')
+
+  from sklearn.naive_bayes import GaussianNB
+#  gnb = GaussianNB()
+  from sklearn import linear_model
+  lm = linear_model.BayesianRidge()
+  from sklearn.model_selection import train_test_split
+  X_train, X_test, y_train, y_test = train_test_split(df[atts], df['dom'], test_size=0.8, random_state=6)
+
+
+#  df['ypred'] = gnb.fit(df[atts], df['dom']).predict(df[atts])
+  #df['ypred'] =
+  lm.fit(X_train, y_train).predict(X_test)
+
+  X_test['ypred'] = lm.predict(X_test)
+  X_test['dom'] = y_test
+
+  df = X_test.copy(deep=True)
+
+ # df2['ypred'] = gnb.fit(df2[atts], df2['dom']).predict(df2[atts])
+
+  test_set['ypred'] = lm.predict(test_set[atts])
+
+  #df['ypred'] = mnb.fit(df[atts], df['dom']).predict(df[atts])
+
+  #df= pd.concat([df, df2])
+
+  plt.rcParams['figure.figsize'] = (10, 6)
+  fig, ax = plt.subplots(1,2)
+
+  y = df['dom']
+  x = df[atts]
+
+  import itertools
+  color = iter(['r','g','b','y'])
+
+  import seaborn as sns
+  df = df.sort_values(by='ypred')
+  df = df.reset_index(drop=True)
+  df['index'] = list(df.index)
+
+  test_set = test_set.sort_values(by='ypred')
+  test_set = test_set.reset_index(drop=True)
+  test_set['index'] = list(test_set.index)
+
+  for u in df['dom'].unique():
+    tdf = df[df['dom'] == u]
+    ttdf = test_set[test_set['dom'] == u]
+
+
+    sns.regplot(data=tdf, x='index', y='ypred', ax=ax[0], color=next(color), fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10, y_jitter=0.1)
+
+    sns.regplot(data=ttdf, x='index', y='ypred', ax=ax[1], color=next(color), fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10, y_jitter=0.1)
+
+
+  ax[1].legend(loc='upper left', prop={'size': 13})
+  ax[0].legend(loc='upper left', prop={'size': 13})
+
+
+  ax[0].set_ylabel('Prediction')
+  ax[0].set_xlabel('Individual Grain')
+  ax[1].set_ylabel('Prediction')
+  ax[1].set_xlabel('Individual Grain')
+  fig.tight_layout()
+  #fig.savefig('../Figures/Suppl/Reg_Dom.png')
+
+  df['ypred'] = df.apply(lambda x: np.around(x['ypred']), axis=1)
+  test_set['ypred'] = test_set.apply(lambda x: np.around(x['ypred']), axis=1)
+
+
+  print('ORIGINAL')
+  print("Number of mislabeled points out of a total {0} points : {1}".format(df.shape[0],(df['dom'] != df['ypred']).sum()))
+  print("Accuracy: {0}%".format(np.around(100*(1-((df['dom'] != df['ypred']).sum())/df.shape[0]))))
+
+  print('TEST SET')
+  print("Number of mislabeled points out of a total {0} points : {1}".format(test_set.shape[0],(test_set['dom'] != test_set['ypred']).sum()))
+  print("Accuracy: {0}%".format(np.around(100*(1-((test_set['dom'] != test_set['ypred']).sum())/test_set.shape[0]))))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[74]:
+[[file:./obipy-resources/PdwDwb.png]]
+:END:
+
+* NN
+
+
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+  from sklearn.model_selection import train_test_split
+  from sklearn.preprocessing import StandardScaler
+
+  print_me = False
+
+  compare_groups = [('T. monococcum', 'T. beoticum'),
+                    ('T. dicoccum', 'T. dicoccoides'),
+                    ('H. spontaneum', 'H. vulgare'),
+                    ('T. beoticum', 'T. dicoccoides'),
+                    ('T. monococcum', 'T. dicoccum')]
+
+  einkorn = pd.read_excel('../all_data_tidy.xlsx',
+                          sheet_name='{0}-{1}'.format(compare_groups[0][0],
+                                                      compare_groups[0][1]))
+  emmer = pd.read_excel('../all_data_tidy.xlsx',
+                        sheet_name='{0}-{1}'.format(compare_groups[1][0],
+                                                    compare_groups[1][1]))
+
+  test_data = pd.read_excel('../all_data_tidy.xlsx', sheet_name='Testing Data')
+
+
+  atts = ['length', 'depth', 'width']
+  plt.rcParams['figure.figsize'] = (8, 8)
+  fig, ax = plt.subplots(2, 2)
+  idx = 0
+  c = iter(['r', 'b', 'g', 'y', 'r', 'b'])
+  for k, df in {'Einkorn': einkorn.copy(),
+                'Emmer': emmer.copy(),
+                'Test_Einkorn': test_data.copy(),
+                'Barley' : barley.copy()}.items():
+
+      df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+      X_train, X_test, y_train, y_test = train_test_split(df[atts],
+                                                          df['dom'],
+                                                          test_size=0.50,
+                                                          random_state=2)
+      X_train['dom'] = y_train
+      X_test['dom'] = y_test
+
+
+      from sklearn.neural_network import MLPClassifier
+
+      model = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(20,20), random_state=1).fit(X_train[atts], y_train)
+
+
+      X_test['ypred'] = model.predict(X_test[atts])
+      if idx == 1:
+          X_test[X_test['ypred'] < 2.5] = 3
+      elif idx == 2:
+          X_test[X_test['ypred'] < 0.5] = 1
+          X_test[X_test['ypred'] > 2.5] = 2
+
+      X_test['r_ypred'] = X_test.apply(lambda x: np.around(x['ypred']), axis=1)
+
+      correct = (X_test['dom'] == X_test['r_ypred']).sum()
+      num_grain = X_test.shape[0]
+      incorrect = num_grain - correct
+      percentage = np.around((correct/num_grain)*100)
+
+      if print_me:
+          print('{0}'.format(k))
+          print("Total Grains: {0}\nTotal Correct: {1}\nTotal Incorrect: {2}".format(num_grain, correct,incorrect))
+          print("Accuracy: {0}%\n".format(percentage))
+
+      X_test = X_test.sort_values(by='ypred')
+      X_test = X_test.reset_index(drop=True)
+      X_test['index'] = list(X_test.index)
+
+      sns.swarmplot(data=X_test, y='ypred', x='r_ypred', ax=ax[idx//2, idx%2], hue='dom')
+      ax[idx//2, idx%2].set_title('{0}  \n Acc: {1}%'.format(k, percentage))
+      ax[idx//2, idx%2].set_ylabel('Prediction Value')
+      ax[idx//2, idx%2].set_xlabel('Prediction Group')
+      ax[idx//2, idx%2].legend_.remove()
+      handles, labels = ax[idx//2, idx%2].get_legend_handles_labels()
+      labels = ['Wild','Domesticated']
+      l = ax[idx//2, idx%2].legend(handles[0:2], labels[:2], loc='upper left')
+
+      # labels = [item.get_text() for item in ax[idx].get_xticklabels()]
+      # labels[0] = 'Domesticated\nEmmer' if idx == 1 else 'Domesticated\nEinkorn'
+      # labels[1] = 'Wild Emmer'if idx == 1 else 'Wild\nEinkorn'
+      # _ = ax[idx].set_xticklabels(labels)
+      idx = idx+1
+
+  fig.tight_layout()
+  #fig.savefig('../Figures/model.png', dpi=300)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[589]:
+[[file:./obipy-resources/MtVqNc.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session :results raw drawer :exports results :exports results
+
+
+  def aggregate_average_attribute(df, att):
+      return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
+                              as_index=False)[att].mean()
+  atts = ['length','width','depth']
+  #df = aggregate_average_attribute(pd.concat([einkorn, emmer]), atts)
+  df = (pd.concat([einkorn, emmer]))
+  df = df.sort_values(by='Ploidy')
+  def allocate_ploidy_dom(x):
+      if (x['Ploidy'] == '2n'):
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 1
+          return 2
+      else:
+          if (x['Wild/Domesticated'] == 'wild'):
+              return 3
+      return 4
+
+  df['dom'] = df.apply(allocate_ploidy_dom, axis=1)
+  df = df.sort_values(by='dom')
+
+
+  from sklearn.neural_network import MLPClassifier
+  from sklearn.model_selection import train_test_split
+  X_train, X_test, y_train, y_test = train_test_split(df[atts], df['dom'], test_size = 0.20)
+
+  mlp = MLPClassifier(solver='adam', alpha=1e-5, hidden_layer_sizes=(20,20), random_state=1)
+  mlp.fit(X_train, y_train.values.ravel())
+
+  predictions = mlp.predict(X_test)
+
+  X_test['dom'] = y_test
+  X_test['ypred']  = predictions
+  df = X_test
+  #df['ypred'] = mnb.fit(df[atts], df['dom']).predict(df[atts])
+
+  #df = y_test
+  plt.rcParams['figure.figsize'] = (10, 6)
+  fig, ax = plt.subplots(1,2)
+
+  y = df['dom']
+  x = df[atts]
+
+  import itertools
+  color = iter(['r','g','b','y'])
+
+  import seaborn as sns
+  df = df.sort_values(by='ypred')
+  df = df.reset_index(drop=True)
+  df['index'] = list(df.index)
+
+  for u in df['dom'].unique():
+    tdf = df[df['dom'] == u]
+    idx = 1
+    if tdf.iloc[0]['dom'] < 3:
+      idx = 0
+    sns.regplot(data=tdf, x='index', y='ypred', ax=ax[idx], color=next(color), fit_reg=False,  scatter_kws={"s": 50, "linewidth" :0.2, "edgecolors":'k', 'alpha':0.7}, label=u,x_jitter=10)
+  ax[1].legend(loc='upper left', prop={'size': 13})
+  ax[0].legend(loc='upper left', prop={'size': 13})
+
+  ax[0].set_ylabel('Prediction')
+  ax[0].set_xlabel('Individual Grain')
+  ax[0].set_xlim(-20,900)
+  ax[1].set_xlim(-20,950)
+  ax[1].set_ylabel('Prediction')
+  ax[1].set_xlabel('Individual Grain')
+  fig.tight_layout()
+  #fig.savefig('../Figures/Suppl/Reg_Dom.png')
+
+
+  from sklearn.metrics import classification_report, confusion_matrix
+  print(confusion_matrix(y_test,predictions))
+  print(classification_report(y_test,predictions))
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[21]:
+[[file:./obipy-resources/TUrFs3.png]]
+:END:

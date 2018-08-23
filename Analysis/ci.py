@@ -16,8 +16,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 from ct_analysing_library.statistical_tests import baysian_hypothesis_test
 from ct_analysing_library.graphing import plot_difference_of_means, plot_forest_plot, plot_pca
 from half_viol import half_violinplot
-
 plt.style.use('ggplot')
+
+# sns.set_palette("Set2")
 
 
 def split_on_two_sample_types(df, type1, type2):
@@ -40,8 +41,11 @@ def data_to_groups(orig_df, groups, attribute):
 
 
 def aggregate_average_attribute(df, att):
-    return df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated', 'Ploidy'],
-                      as_index=False)[[att]].mean()
+    return df.groupby(['Sample name',
+                       'Sample Type',
+                       'Wild/Domesticated',
+                       'Ploidy',
+                       'Ploidy-Domestication'], as_index=False)[[att]].mean()
 
 
 def make_top_bottom(df):
@@ -71,8 +75,6 @@ def make_pca_figures(orig_df, atts, groups):
     g = plot_pca(pca, dfx, 'Sample Type', single_plot=True)
 
     return g, dfx, pca
-    # plt.show()
-    # g.savefig('{0}/{1}'.format(rootdir, 'pca_plot.png'))
 
 
 def plot_cov_ellipse(cov, pos, nstd=2, ax=None, **kwargs):
@@ -173,7 +175,7 @@ def make_bayesian_plots(df, compare_groups, atts):
     return bayes
 
 
-def boxplot(df, groups, attribute, show=False, saveloc=None, split=False):
+def boxplot(df, groups, attribute, show=False, saveloc=None, split=False, sig='*'):
 
     if split:
         df = split_on_two_sample_types(df, groups[0], groups[1])
@@ -187,43 +189,58 @@ def boxplot(df, groups, attribute, show=False, saveloc=None, split=False):
 
     if len(df['Wild/Domesticated'].unique()) == 1:
         df = df.sort_values(by=['Ploidy'])
+
     else:
         df = df.sort_values(by=['Wild/Domesticated'], ascending=False)
 
-    fig, ax = plt.subplots(figsize=(5.5, 4))
-
+    if len(df['Ploidy'].unique() == 3):
+        fig, ax = plt.subplots(figsize=(4, 4))
+    else:
+        fig, ax = plt.subplots(figsize=(3, 4))
     if not split:
         sns.boxplot(data=df, x='Ploidy', y=attribute,
                     ax=ax, hue='Wild/Domesticated')
 
     elif len(df['Wild/Domesticated'].unique()) == 1:
         sns.boxplot(data=df, x='Sample Type', y=attribute,
-                    ax=ax, hue='Ploidy')
+                    ax=ax)
     else:
         sns.boxplot(data=df, x='Sample Type', y=attribute,
-                    ax=ax, hue='Wild/Domesticated')
+                    ax=ax)
 
     if split:
         p = do_test(df, groups, attribute)[0]
     else:
         p = 1
     title = attribute.capitalize()
-    fig.suptitle(title.replace('_', ' '))
+    #fig.suptitle(title.replace('_', ' '))
 
-    if attribute != 'length':
+    if attribute != 'volume':
         ax.legend().set_visible(False)
 
-    if attribute in ['length', 'width', 'depth']:
+    if attribute in ['volume', 'width', 'length']:
         ax.set_xlabel('')
-        ax.set_ylabel('{0} cm'.format(attribute.capitalize()))
-    if attribute == 'volume':
-        ax.set_ylabel(r'{0} $cm^3$'.format(attribute.capitalize()))
-    if attribute == 'length_depth_width':
-        ax.set_ylabel(r'Length X Width x Depth $cm^3$')
-    if attribute == 'surface_area':
-        ax.set_ylabel(r'Surface Area $cm^2$')
-        ax.set_xlabel('Surface Area')
+    else:
+        ax.set_xlabel('')
 
+    if attribute in ['length', 'width', 'depth']:
+        ax.set_ylabel('{0} mm'.format(attribute.capitalize()))
+    if attribute == 'volume':
+        ax.set_ylabel(r'{0} $mm^3$'.format(attribute.capitalize()))
+    if attribute == 'length_depth_width':
+        ax.set_ylabel(r'Length X Width x Depth $mm^3$')
+    if attribute == 'surface_area':
+        ax.set_ylabel(r'Surface Area $mm^2$')
+
+    if sig != False:
+        # statistical annotation
+        x1, x2 = 0, 1
+        inc = df[attribute].max()/10
+        y, h, col = df[attribute].max() + inc, inc, 'k'
+        plt.plot([x1, x1, x2, x2], [y, y+h, y+h, y], lw=1.5, c=col)
+        plt.text((x1+x2)*.5, y+h, sig, ha='center', va='bottom', color=col)
+
+    fig.tight_layout()
     if show:
         plt.show(block=False)
     if saveloc:
@@ -231,6 +248,7 @@ def boxplot(df, groups, attribute, show=False, saveloc=None, split=False):
 
 
 def do_test(df, groups, attribute, say=False):
+
     d1, d2 = data_to_groups(df, groups, attribute)
     ind_t_test = stats.ttest_ind(d1, d2, equal_var=False)
     N1 = len(d1)
@@ -270,50 +288,92 @@ def make_results_table(df, groups, attributes_to_test, say=False):
                        '0.975': upper_ci})
         s.name = attribute
         results = results.append(s)
+
+    def pval_col(x):
+        return ['background-color: green' if x['pval'] < 0.01 else '' for v in range(5)]
+
+    results = results.style.apply(pval_col, axis=1)
     return results
 
 
-def make_violin_plots(df_orig, att, compare_groups, saveloc):
+def make_violin_plots(df_orig, att, compare_groups, saveloc, x='Sample Type'):
     if 'mean' in att or 'std' in att or 'height' in att or 'density' in att:
         df = aggregate_average_attribute(df_orig, att)
+        return 0
     else:
         df = df_orig.copy(deep=True)
     df = df.sort_values(
         by=['Wild/Domesticated', 'Ploidy'], ascending=[False, True])
-    f, ax = plt.subplots(1, figsize=(8, 10))
-    ax = half_violinplot(data=df, x='Sample Type',
+    f, ax = plt.subplots(1, figsize=(5.5, 4))
+    print(saveloc)
+    ax = half_violinplot(data=df, x=x,
                          y=att, bw='scott',  linewidth=1, cut=0.5,
                          scale="area", width=.4, inner=None)
 
-    ax = sns.stripplot(data=df, x='Sample Type', y=att,
+    ax = sns.stripplot(data=df, x=x, y=att,
                        edgecolor="white", size=2, jitter=1, zorder=0)
 
-    ax = sns.boxplot(data=df, x='Sample Type', y=att,
+    ax = sns.boxplot(data=df, x=x, y=att,
                      zorder=10, showcaps=True,
                      boxprops={'facecolor': 'none', "zorder": 10},
                      showfliers=True, whiskerprops={'linewidth': 2, "zorder": 10},
                      saturation=1, width=.15,
-                     hue=('Wild/Domesticated' if len(df['Ploidy'].unique()) <= 1 else 'Ploidy'))
+                     hue='Ploidy-Domestication')
+
     sns.despine(left=True)
+    title = att.capitalize()
+    f.suptitle(title.replace('_', ' '))
+
+    if att in ['length', 'width', 'depth']:
+        ax.set_ylabel('{0} mm'.format(att.capitalize()))
+    if att == 'volume':
+        ax.set_ylabel(r'{0} $mm^3$'.format(att.capitalize()))
+    if att == 'length_depth_width':
+        ax.set_ylabel(r'Length X Width x Depth $mm^3$')
+    if att == 'surface_area':
+        ax.set_ylabel(r'Surface Area $mm^2$')
+        ax.set_xlabel('Surface Area')
+
     f.savefig(saveloc)
 
 
-def make_boxplots(df, groups, atts, split=True):
+def make_boxplots(df, groups, atts, split=True, ploidy_dom=False):
 
     if split:
         t_df = split_on_two_sample_types(df, groups[0], groups[1])
         basedir = '../Plots/{0}-{1}'.format(groups[0], groups[1])
     else:
         t_df = df
-        basedir = '../Plots/2n-4n-6n'
+        basedir = '../Plots/2n-4n' if ploidy_dom else '../Plots/2n-4n-6n'
 
     if not os.path.exists(basedir):
         os.makedirs(basedir)
     for a in atts:
+
+        try:
+            pval, tval, diff_mean, lower_ci, upper_ci = do_test(
+                df, groups, a, say=False)
+        except Exception as e:
+            pval = -1
         saveloc = '{0}/{1}.png'.format(basedir, a)
-        boxplot(t_df, groups, a, saveloc=saveloc, split=split)
-        saveloc = '{0}/{1}-half-violin.png'.format(basedir, a)
-        # make_violin_plots(t_df, a, groups, saveloc)
+
+        if pval < 0:
+            sig = False
+        elif pval < 0.01:
+            sig = '*'
+        elif pval < 0.05:
+            sig = 'ns'
+        else:
+            sig = 'ns'
+        boxplot(t_df, groups, a, saveloc=saveloc,
+                split=split, sig=sig)
+        #saveloc = '{0}/{1}-half-violin.png'.format(basedir, a)
+        #make_violin_plots(t_df, a, groups, saveloc)
+
+        # if ploidy_dom:
+        #     saveloc = '{0}/{1}-half-violin-ploidy_dom.png'.format(basedir, a)
+        #     make_violin_plots(t_df, a, groups, saveloc,
+        #                       x='Ploidy-Domestication')
 
 
 def analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=None):
@@ -346,6 +406,9 @@ def analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=None):
     make_boxplots(barley, compare_groups[2], atts)
     make_boxplots(pd.concat([emmer, einkorn]), compare_groups[3], atts)
     make_boxplots(pd.concat([emmer, einkorn]), compare_groups[4], atts)
+
+    make_boxplots(pd.concat([emmer, einkorn]),
+                  ['2n', '4n'], atts, split=False, ploidy_dom=True)
 
     # b_name = '/home/nathan/Dropbox/NPPC/Domestication/Bayesian_Testing.xlsx'
     # writer = pd.ExcelWriter(b_name)
@@ -525,6 +588,22 @@ def make_all_pca(einkorn, emmer, barley):
                         'mean_depth', 'mean_volume',
                         'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Emmer and Einkorn')
 
+    g, dfx, pca = pca_figure(split_on_two_sample_types(pd.concat([einkorn, emmer]), compare_groups[0][0], compare_groups[1][0]),
+                             atts, compare_groups, saveloc='../Results/pca_dom_einkorn_emmer.pdf')
+    writer = pd.ExcelWriter('../Results/PCA_Results_For_All_Wheat.xlsx')
+    pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
+                 index=['mean_width', 'mean_length',
+                        'mean_depth', 'mean_volume',
+                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Wild Emmer and Einkorn')
+
+    g, dfx, pca = pca_figure(split_on_two_sample_types(pd.concat([einkorn, emmer]), compare_groups[0][1], compare_groups[1][1]),
+                             atts, compare_groups, saveloc='../Results/pca_wild_einkorn_emmer.pdf')
+    writer = pd.ExcelWriter('../Results/PCA_Results_For_All_Wheat.xlsx')
+    pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
+                 index=['mean_width', 'mean_length',
+                        'mean_depth', 'mean_volume',
+                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Wild Emmer and Einkorn')
+
     g, dfx, pca = pca_figure(pd.concat(
         [einkorn]), atts, compare_groups, saveloc='../Results/pca_einkorn.pdf')
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
@@ -586,8 +665,8 @@ def pca_figure(df, atts, compare_groups, saveloc=None):
     plt.subplots_adjust(right=0.7)
 
     plt.gcf().suptitle('')
-    plt.gcf().savefig(saveloc)
     plt.gcf().savefig(saveloc.replace('pdf', 'png'))
+    plt.gcf().savefig(saveloc)
 
     # for simplex in hull.simplices:
     #     g.ax.plot(hull.points[simplex, 0], hull.points[simplex, 1], 'k-')
@@ -598,10 +677,8 @@ def pca_figure(df, atts, compare_groups, saveloc=None):
     return g, dfx, pca
 
 
-atts = ['length', 'width', 'depth', 'volume',
-        'surface_area', 'length_depth_width',
-        'mean_length', 'mean_width', 'mean_depth', 'mean_volume',
-        'mean_surface_area', 'mean_length_depth_width', 'density', 'Surface Area - Volume Ratio']
+atts = ['volume', 'length', 'width', 'depth', 'surface_area',
+        'length_depth_width', 'Surface Area - Volume']
 
 
 # atts = ['length', 'width', 'depth', 'volume',
@@ -633,9 +710,19 @@ barley = pd.read_excel('../all_data_tidy.xlsx',
                        sheet_name='{0}-{1}'.format(compare_groups[2][0],
                                                    compare_groups[2][1]))
 
+
+# aestivum is mdivs now
 aestivum = pd.read_excel('../all_data_tidy.xlsx',
                          sheet_name='T. aestivum')
 
+aestivum['surface_area'] = aestivum['surface_area']*100
+aestivum['volume'] = aestivum['volume']*100
+aestivum['Ploidy'] = '6n'
+aestivum['Wild/Domesticated'] = 'domesticated'
+aestivum['length_depth_width'] = aestivum.apply(
+    lambda x: x['length'] * x['depth'] * x['width'], axis=1)
+
+test_data = pd.read_excel('../all_data_tidy.xlsx', sheet_name='Testing Data')
 
 einkorn['slices'] = einkorn['height']
 emmer['slices'] = emmer['height']
@@ -645,9 +732,27 @@ barley['slices'] = barley['height']
 def sa_ratio(x): return x['surface_area']/x['volume']
 
 
-einkorn['Surface Area - Volume Ratio'] = einkorn.apply(sa_ratio, axis=1)
-emmer['Surface Area - Volume Ratio'] = emmer.apply(sa_ratio, axis=1)
-barley['Surface Area - Volume Ratio'] = barley.apply(sa_ratio, axis=1)
+aestivum['Surface Area - Volume'] = aestivum.apply(sa_ratio, axis=1)
+aestivum = aestivum[aestivum['Surface Area - Volume'] < 2.5]
+
+einkorn['Surface Area - Volume'] = einkorn.apply(sa_ratio, axis=1)
+einkorn = einkorn[einkorn['Surface Area - Volume'] < 4]
+
+emmer['Surface Area - Volume'] = emmer.apply(sa_ratio, axis=1)
+emmer = emmer[emmer['Surface Area - Volume'] < 4]
+
+barley['Surface Area - Volume'] = barley.apply(sa_ratio, axis=1)
+barley = barley[barley['Surface Area - Volume'] < 4]
+
+
+def ploidy_dom_name(x):
+    return '{0} - {1}'.format(x['Ploidy'], x['Wild/Domesticated'])
+
+
+einkorn['Ploidy-Domestication'] = einkorn.apply(ploidy_dom_name, axis=1)
+emmer['Ploidy-Domestication'] = emmer.apply(ploidy_dom_name, axis=1)
+barley['Ploidy-Domestication'] = barley.apply(ploidy_dom_name, axis=1)
+
 
 make_top_bottom(einkorn)
 make_top_bottom(emmer)
@@ -664,9 +769,10 @@ barley['height'] = barley.apply(height_to_mm, axis=1)
 einkorn['z_mm'] = einkorn.apply(z_to_mm, axis=1)
 emmer['z_mm'] = emmer.apply(z_to_mm, axis=1)
 barley['z_mm'] = barley.apply(z_to_mm, axis=1)
-
+barley = barley[barley['Row'] == '2_row']
 
 plt.close('all')
 
-# make_all_pca(einkorn, emmer, barley)
-analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=aestivum)
+
+#make_all_pca(einkorn, emmer, barley)
+#analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=aestivum)

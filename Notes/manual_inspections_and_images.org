@@ -1,0 +1,49 @@
+* DONE Einkorn
+  CLOSED: [2018-07-05 Thu 07:47]
+
+[[file:~/Dropbox/NPPC/Domestication/3D-Compare-Images/Einkorn(dom left, nondom right).png][Image]]
+
+** Domesticated:
+
+*** Scans used
+| 3890 | T_monococcum_9 | X |
+| 3888 | T_monococcum_7 |   |
+
+** Wild:
+
+*** Scans used:
+| 4928 | T_monococcum_wild_19 |   |                |
+| 3876 | T_monococcum_wild_4  |   | Seeds in tape! |
+| 2892 | T_monococcum_wild_1  | X |                |
+
+
+
+* DONE Emmer
+  CLOSED: [2018-07-05 Thu 09:39]
+
+[[file:~/Dropbox/NPPC/Domestication/3D-Compare-Images/Emmer(dom, left, nondom right).png][Image]]
+
+** Domesticated:
+
+*** Scans used:
+| 2884 | T_dicoccum_3 | X |
+| 2882 | T_dicoccum_1 |   |
+
+** Wild:
+
+*** Scans used:
+| 2890 | T_dicoccoides_2 | X |
+| 2891 | T_dicoccoides_3 |   |
+
+* Barley
+** Domesticated:
+
+*** Scans used:
+| 3918 | H_vulgare_3  | X |
+| 3927 | H_vulgare_12 |   |
+
+** Wild:
+
+*** Scans used:
+| 3912 | H_spontaneum_wild_7 |
+| 3907 | H_spontaneum_wild_2 |

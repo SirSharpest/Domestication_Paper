@@ -1,0 +1,155 @@
+#+TITLE: Comparing Domestication
+#+OPTIONS: toc:nil num:nil ^:nil
+#+LaTeX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_HEADER: \usepackage{amssymb,amsmath}
+#+LaTeX_HEADER: \usepackage{fancyhdr} %For headers and footers
+#+LaTeX_HEADER: \pagestyle{fancy} %For headers and footers
+#+LaTeX_HEADER: \usepackage{lastpage} %For getting page x of y
+#+LaTeX_HEADER: \usepackage{float} %Allows the figures to be positioned and formatted nicely
+#+LaTeX_HEADER: \restylefloat{figure} %and this command
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \hypersetup{urlcolor=blue}
+#+LaTex_HEADER: \usepackage{titlesec}
+#+LaTex_HEADER: \setcounter{secnumdepth}{4}
+#+LaTeX_HEADER: \usepackage{minted}
+#+LATEX_HEADER: \setminted{frame=single,framesep=10pt}
+#+LaTeX_HEADER: \chead{}
+#+LaTeX_HEADER: \rhead{\today}
+#+LaTeX_HEADER: \cfoot{}
+#+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
+#+LaTeX_HEADER: \usepackage[parfill]{parskip}
+#+LaTeX_HEADER: \usepackage{subfig}
+#+LaTeX_HEADER: \usepackage{pdfpages}
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
+#+LATEX_HEADER_EXTRA:  \usepackage{framed}
+
+* Information
+- Significance testing for these values were done with one-way-ANOVA
+  - Bayesian estimations where used to fit the data to a normal distribution
+    - From 40,000 estimated data points, sampling was done on every 1000th point
+    - These points were used for the ANOVA parameters.
+- Quantifying the differences where done with the Bayesian T-Test on estimated data.
+
+* Initial Thoughts
+
+
+- Einkorn seems most interesting with significant changes across the board, with the exception of length(this has been previously reported?), length is also not significantly different in Emmer either.
+
+- Einkorn and Emmer both see significant changes in the length,depth,width ratio showing that this is a consistently significant change/indicator.
+
+- Einkorn and Emmer depth is significant too - I think John/Candida mentioned this being interesting as previous studies haven't been able to examine this trait fully?
+
+- Oddly, the surface area in Emmer isn't highly significant (<0.05,>0.01), yet the ratio trait (length,width,depth) is. Indicating it's perhaps a better measurement to consider when looking at 3D traits.
+
+  - Perhaps, like in previous studies, an interaction trait of lengthXwidth could be used for the marvin data, this might make a good proxy for comparing?
+
+- Numbers for the Emmer, spike-wise, are too low. With 3 data points for the wild, it's not sufficient to grasp anything meaningful
+  - The grain averages, I think are still useful enough
+
+- I don't know how best to interpret / relate the barley and it's meaning with wheat?
+
+\clearpage
+* Summary Tables
+
+** /T. boeticum/ Vs. /T. monococcum/ (Einkorn)
+
+*** Grains
+#+ATTR_LATEX: :environment longtable :align p{5cm}|r
+|                    | T. monococcum+T. beoticum |
+|--------------------+---------------------------|
+| length             | 0.7045                    |
+| width              | < 0.001                   |
+| depth              | < 0.001                   |
+| volume             | < 0.001                   |
+| surface_area       | < 0.001                   |
+| length_depth_width | < 0.001                   |
+
+
+
+*** Spike Averages
+#+ATTR_LATEX: :environment longtable :align p{5cm}|r
+|                         | T. monococcum+T. beoticum |
+|-------------------------+---------------------------|
+| mean_length             | 0.1848                    |
+| mean_width              | < 0.001                   |
+| mean_depth              | < 0.001                   |
+| mean_volume             | < 0.001                   |
+| mean_surface_area       | < 0.001                   |
+| mean_length_depth_width | < 0.001                   |
+
+
+\clearpage
+** /T. dicoccum/ Vs. /T. dicoccoides/ (Emmer)
+
+*** Grains
+#+ATTR_LATEX: :environment longtable :align p{5cm}|r
+|                    | T. dicoccum+T. dicoccoides |
+|--------------------+----------------------------|
+| length                  |                     0.1106 |
+| width                   |                     0.0141 |
+| depth                   |                     0.0035 |
+| volume                  |                    < 0.001 |
+| surface_area            |                     0.0401 |
+| length_depth_width      |                    < 0.001 |
+
+
+*** Spike Averages
+#+ATTR_LATEX: :environment longtable :align p{5cm}|r
+|                         | T. dicoccum+T. dicoccoides |
+|-------------------------+----------------------------|
+| mean_length             |                     0.4605 |
+| mean_width              |                     0.3065 |
+| mean_depth              |                    < 0.001 |
+| mean_volume             |                    < 0.001 |
+| mean_surface_area       |                      0.192 |
+| mean_length_depth_width |                    < 0.001 |
+
+
+
+\clearpage
+** /H. spontaneum/ Vs. /H. vulgare/ (Barley)
+
+*** Grains
+
+#+ATTR_LATEX: :environment longtable :align p{5cm}|r
+|                    | H. spontaneum+H. vulgare |
+|--------------------+--------------------------|
+| length             |                  < 0.001 |
+| width              |                   0.2417 |
+| depth              |                   0.0001 |
+| volume             |                   0.6158 |
+| surface_area       |                   0.0629 |
+| length_depth_width |                   0.3784 |
+
+
+
+*** Spike Averages
+#+ATTR_LATEX: :environment longtable :align p{5cm}|r
+|                         | H. spontaneum+H. vulgare |
+|-------------------------+--------------------------|
+| mean_length             |                   0.0067 |
+| mean_width              |                   0.4459 |
+| mean_depth              |                   0.0149 |
+| mean_volume             |                   0.2436 |
+| mean_surface_area       |                   0.0575 |
+| mean_length_depth_width |                   0.2752 |
+
+
+
+
+
+#+BEGIN_LaTeX
+\includepdf[pages=-,angle=90,  pagecommand=\section{Einkorn}]{../Summaries/einkorn.pdf}
+#+END_LaTeX
+
+
+#+BEGIN_LaTeX
+\includepdf[pages=-,angle=90,  pagecommand=\section{Emmer}]{../Summaries/emmer.pdf}
+#+END_LaTeX
+
+
+#+BEGIN_LaTeX
+\includepdf[pages=-,angle=90,  pagecommand=\section{Barley}]{../Summaries/barley.pdf}
+#+END_LaTeX
