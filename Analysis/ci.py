@@ -60,8 +60,6 @@ def make_top_bottom(df):
 
 def make_pca_figures(orig_df, atts, groups):
     plt.close('all')
-    atts = ['width', 'length', 'depth', 'volume',
-            'surface_area', 'length_depth_width']
 
     # df = orig_df.groupby(['Sample name', 'Sample Type', 'Wild/Domesticated'],
     #                      as_index=False)[atts].mean()
@@ -337,15 +335,17 @@ def make_violin_plots(df_orig, att, compare_groups, saveloc, x='Sample Type'):
     f.savefig(saveloc)
 
 
-def make_boxplots(df, groups, atts, split=True, ploidy_dom=False):
+def make_boxplots(df, groups, atts, split=True, ploidy_dom=False, basedir=None):
 
-    if split:
-        t_df = split_on_two_sample_types(df, groups[0], groups[1])
-        basedir = '../Plots/{0}-{1}'.format(groups[0], groups[1])
+    if basedir is None:
+        if split:
+            t_df = split_on_two_sample_types(df, groups[0], groups[1])
+            basedir = '../Plots/{0}-{1}'.format(groups[0], groups[1])
+        else:
+            t_df = df
+            basedir = '../Plots/2n-4n' if ploidy_dom else '../Plots/2n-4n-6n'
     else:
         t_df = df
-        basedir = '../Plots/2n-4n' if ploidy_dom else '../Plots/2n-4n-6n'
-
     if not os.path.exists(basedir):
         os.makedirs(basedir)
     for a in atts:
@@ -401,14 +401,14 @@ def analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=None):
         make_boxplots(pd.concat([einkorn, emmer, aestivum]),
                       compare_groups, atts, split=False)
 
-    make_boxplots(einkorn, compare_groups[0], atts)
-    make_boxplots(emmer, compare_groups[1], atts)
-    make_boxplots(barley, compare_groups[2], atts)
-    make_boxplots(pd.concat([emmer, einkorn]), compare_groups[3], atts)
-    make_boxplots(pd.concat([emmer, einkorn]), compare_groups[4], atts)
+    #make_boxplots(einkorn, compare_groups[0], atts)
+    # make_boxplots(emmer, compare_groups[1], atts)
+    # make_boxplots(barley, compare_groups[2], atts)
+    # make_boxplots(pd.concat([emmer, einkorn]), compare_groups[3], atts)
+    # make_boxplots(pd.concat([emmer, einkorn]), compare_groups[4], atts)
 
-    make_boxplots(pd.concat([emmer, einkorn]),
-                  ['2n', '4n'], atts, split=False, ploidy_dom=True)
+    # make_boxplots(pd.concat([emmer, einkorn]),
+    #               ['2n', '4n'], atts, split=False, ploidy_dom=True)
 
     # b_name = '/home/nathan/Dropbox/NPPC/Domestication/Bayesian_Testing.xlsx'
     # writer = pd.ExcelWriter(b_name)
@@ -425,6 +425,40 @@ def analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=None):
     #     [emmer, einkorn]), compare_groups[4], atts), 'dom einkorn - dom emmer')
     # writer.save()
     # writer.close()
+
+
+def make_2n_4n_6n_table(einkorn, emmer, aestivum, atts, sname):
+
+    writer = pd.ExcelWriter(sname)
+
+    all_data = pd.concat([einkorn,
+                          emmer,
+                          aestivum]).sort_values(by=['Ploidy', 'Wild/Domesticated'],
+                                                 ascending=[True, False])
+
+    for a in atts:
+        results = pd.DataFrame(columns=list(all_data['Sample Type'].unique()))
+        ds = [all_data[all_data['Sample Type'] == st]
+              for st in all_data['Sample Type'].unique()]
+        for d in ds:
+
+            t_test_vals = [np.around(stats.ttest_ind(d[a],
+                                                     d2[a],
+                                                     equal_var=False)[1], decimals=4) for d2 in ds]
+            s = pd.Series(
+                {k: v for k, v in zip(all_data['Sample Type'].unique(), t_test_vals)})
+            s.name = list(d['Sample Type'].unique())[0]
+
+            results = results.append(s)
+
+        def pval_col(x):
+            return ['background-color: green' if v < 0.01 else 'background-color: red' for v in x]
+        results = results.style.apply(pval_col)
+
+        results.to_excel(writer, sheet_name=a)
+
+    writer.save()
+    writer.close()
 
 
 def plot_spikes(df, sample_type, ax=None, mi=None, mx=None):
@@ -580,13 +614,17 @@ def fig3(einkorn):
 
 def make_all_pca(einkorn, emmer, barley):
 
+    atts = ['volume', 'length', 'width',
+            'depth', 'surface_area']
+
     g, dfx, pca = pca_figure(pd.concat(
         [einkorn, emmer]), atts, compare_groups, saveloc='../Results/pca_einkorn_emmer.pdf')
+
     writer = pd.ExcelWriter('../Results/PCA_Results_For_All_Wheat.xlsx')
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                  index=['mean_width', 'mean_length',
                         'mean_depth', 'mean_volume',
-                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Emmer and Einkorn')
+                        'mean_surface_area']).to_excel(writer, sheet_name='Emmer and Einkorn')
 
     g, dfx, pca = pca_figure(split_on_two_sample_types(pd.concat([einkorn, emmer]), compare_groups[0][0], compare_groups[1][0]),
                              atts, compare_groups, saveloc='../Results/pca_dom_einkorn_emmer.pdf')
@@ -594,7 +632,7 @@ def make_all_pca(einkorn, emmer, barley):
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                  index=['mean_width', 'mean_length',
                         'mean_depth', 'mean_volume',
-                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Wild Emmer and Einkorn')
+                        'mean_surface_area']).to_excel(writer, sheet_name='Wild Emmer and Einkorn')
 
     g, dfx, pca = pca_figure(split_on_two_sample_types(pd.concat([einkorn, emmer]), compare_groups[0][1], compare_groups[1][1]),
                              atts, compare_groups, saveloc='../Results/pca_wild_einkorn_emmer.pdf')
@@ -602,28 +640,28 @@ def make_all_pca(einkorn, emmer, barley):
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                  index=['mean_width', 'mean_length',
                         'mean_depth', 'mean_volume',
-                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Wild Emmer and Einkorn')
+                        'mean_surface_area']).to_excel(writer, sheet_name='Wild Emmer and Einkorn')
 
     g, dfx, pca = pca_figure(pd.concat(
         [einkorn]), atts, compare_groups, saveloc='../Results/pca_einkorn.pdf')
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                  index=['mean_width', 'mean_length',
                         'mean_depth', 'mean_volume',
-                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Einkorn')
+                        'mean_surface_area']).to_excel(writer, sheet_name='Einkorn')
 
     g, dfx, pca = pca_figure(
         pd.concat([emmer]), atts, compare_groups, saveloc='../Results/pca_emmer.pdf')
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                  index=['mean_width', 'mean_length',
                         'mean_depth', 'mean_volume',
-                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Emmer')
+                        'mean_surface_area']).to_excel(writer, sheet_name='Emmer')
 
     g, dfx, pca = pca_figure(
         pd.concat([barley]), atts, compare_groups, saveloc='../Results/pca_barley.pdf')
     pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                  index=['mean_width', 'mean_length',
                         'mean_depth', 'mean_volume',
-                        'mean_surface_area', 'mean_length_depth_width']).to_excel(writer, sheet_name='Barley')
+                        'mean_surface_area']).to_excel(writer, sheet_name='Barley')
 
     writer.save()
     writer.close()
@@ -632,6 +670,7 @@ def make_all_pca(einkorn, emmer, barley):
 def pca_figure(df, atts, compare_groups, saveloc=None):
     from pandas.plotting import table
 
+    print(atts)
     x = df.reset_index(drop=True)
     g, dfx, pca = make_pca_figures(x, atts, compare_groups)
 
@@ -649,9 +688,10 @@ def pca_figure(df, atts, compare_groups, saveloc=None):
         plot_point_cov(points, nstd=1.5, alpha=0.3,
                        color=next(palette), ax=g.ax)
 
+    print(pca.components_.T)
     d = np.around(pd.DataFrame(pca.components_.T, columns=['PC-1', 'PC-2'],
                                index=['Width', 'Length', 'Depth', 'Volume',
-                                      'Surface A      .', 'L x W x D']), 2)
+                                      'Surface A      .']), 2)
     p = np.around(d.values, 2)
     # p = abs(p)
     normalized = (p-p.min())/(p.max()-p.min())
@@ -665,7 +705,9 @@ def pca_figure(df, atts, compare_groups, saveloc=None):
     plt.subplots_adjust(right=0.7)
 
     plt.gcf().suptitle('')
-    plt.gcf().savefig(saveloc.replace('pdf', 'png'))
+    # this is modified for the extra atts,
+
+    plt.gcf().savefig(saveloc.replace('pdf', '-L_W.png'))
     plt.gcf().savefig(saveloc)
 
     # for simplex in hull.simplices:
@@ -675,6 +717,35 @@ def pca_figure(df, atts, compare_groups, saveloc=None):
 
     # plt.show(block=False)
     return g, dfx, pca
+
+
+def is_diff(g1, g2, df, att):
+
+    d1 = df[df['Sample Type'] == g1][att]
+    d2 = df[df['Sample Type'] == g2][att]
+    t, p = stats.ttest_ind(d1, d2, equal_var=False)
+    print('{0} \t {1}: \t {2}'.format(g1, g2, p))
+    return True if p < 0.05 else False
+
+
+def allocate_grouping(groups, att, df):
+    from string import ascii_lowercase as letters
+    res = []
+    res.append([groups[0]])
+
+    for idx, g in enumerate(groups):
+        found = False
+        for g2 in res[idx]:
+            if not found:
+                if is_diff(g, g2, df, att):
+                    res.append([g])
+                    found = True
+                if not found:
+                    if g not in res[idx]:
+                        res[idx].append(g)
+            else:
+                break
+    return res
 
 
 atts = ['volume', 'length', 'width', 'depth', 'surface_area',
@@ -732,17 +803,28 @@ barley['slices'] = barley['height']
 def sa_ratio(x): return x['surface_area']/x['volume']
 
 
+def l_w(x): return x['length']*x['width']
+
+
+test_data['Surface Area - Volume'] = test_data.apply(sa_ratio, axis=1)
+test_data['length_width'] = test_data.apply(l_w, axis=1)
+test_data = test_data[test_data['Surface Area - Volume'] < 4]
+
 aestivum['Surface Area - Volume'] = aestivum.apply(sa_ratio, axis=1)
 aestivum = aestivum[aestivum['Surface Area - Volume'] < 2.5]
+aestivum['length_width'] = aestivum.apply(l_w, axis=1)
 
 einkorn['Surface Area - Volume'] = einkorn.apply(sa_ratio, axis=1)
 einkorn = einkorn[einkorn['Surface Area - Volume'] < 4]
+einkorn['length_width'] = einkorn.apply(l_w, axis=1)
 
 emmer['Surface Area - Volume'] = emmer.apply(sa_ratio, axis=1)
 emmer = emmer[emmer['Surface Area - Volume'] < 4]
+emmer['length_width'] = emmer.apply(l_w, axis=1)
 
 barley['Surface Area - Volume'] = barley.apply(sa_ratio, axis=1)
 barley = barley[barley['Surface Area - Volume'] < 4]
+barley['length_width'] = barley.apply(l_w, axis=1)
 
 
 def ploidy_dom_name(x):
@@ -775,4 +857,9 @@ plt.close('all')
 
 
 #make_all_pca(einkorn, emmer, barley)
+
+
 #analyse_all(einkorn, emmer, barley, compare_groups, atts, aestivum=aestivum)
+
+comp_groups2 = ('T. monococcum', 'T. beoticum', 'T. dicoccum',
+                'T. dicoccoides', 'T. aestivum')
